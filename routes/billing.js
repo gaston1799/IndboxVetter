@@ -2,12 +2,12 @@ const express = require("express");
 const router = express.Router();
 
 const { requireAuth } = require("../middleware/authMiddleware");
-const { getCredits, addCredits } = require("../controllers/billingController");
+const {
+  getSubscription,
+  updateSubscription,
+} = require("../controllers/billingController");
 
-// Get current credits
-router.get("/credits", requireAuth, getCredits);
-
-// Add credits manually (in production this is handled by the Stripe webhook)
-router.post("/credits/add", requireAuth, addCredits);
+router.get("/subscription", requireAuth, getSubscription);
+router.post("/subscription", requireAuth, updateSubscription);
 
 module.exports = router;

@@ -3,25 +3,30 @@ const express = require("express");
 const router = express.Router();
 const { requireAuth } = require("../middleware/authMiddleware");
 const { requireAdmin } = require("../middleware/adminMiddleware");
-const { getTransactions } = require("../config/db");
-const { User, Transaction } = require("../models");
+const { User } = require("../models");
 
-// Example: view recent transactions for any email
-router.get("/transactions", requireAuth, requireAdmin, async (req, res) => {
-  const email = req.query.email || req.session.user.email;
-  const items = await Transaction.list(email, 200);
-  res.json({ ok: true, items });
+// View subscriptions for all users
+router.get("/subscriptions", requireAuth, requireAdmin, async (req, res) => {
+  const users = await User.list();
+  res.json({ ok: true, users });
 });
 
-// Example: manual credit adjust
-router.post("/credits/adjust", requireAuth, requireAdmin, async (req, res) => {
-  const { email, delta } = req.body || {};
-  if (!email || typeof delta !== "number") {
-    return res.status(400).json({ ok:false, error: "email and numeric delta required" });
+// Update a user's subscription (admin override)
+router.post("/subscriptions", requireAuth, requireAdmin, async (req, res) => {
+  const { email, plan, status, seats, renewsAt } = req.body || {};
+  if (!email) {
+    return res.status(400).json({ ok: false, error: "email required" });
   }
-  const newBal = await User.addCredits(email, delta);
-  await Transaction.create({ email, amount: delta, type: "adjustment", meta: { by: req.session.user.email } });
-  res.json({ ok:true, balance: newBal });
+  const subscription = await User.updateSubscription(email, {
+    plan,
+    status,
+    seats,
+    renewsAt,
+  });
+  if (!subscription) {
+    return res.status(404).json({ ok: false, error: "User not found" });
+  }
+  res.json({ ok: true, subscription });
 });
 
 module.exports = router;

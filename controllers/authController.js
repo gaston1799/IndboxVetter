@@ -6,13 +6,13 @@ exports.loginSuccess = (req, res) => {
   }
 
   // Save/update user in our JSON DB
-  upsertUser({
+  const user = upsertUser({
     email: req.user.email,
     name: req.user.name,
-    credits: 0, // keep credits unchanged if user already exists
+    picture: req.user.picture,
   });
 
-  res.json({ ok: true, user: req.user });
+  res.json({ ok: true, user });
 };
 
 exports.logout = (req, res) => {

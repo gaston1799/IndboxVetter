@@ -12,7 +12,10 @@
     <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <div class="h-8 w-8 rounded-xl bg-indigo-600"></div>
-        <h1 class="text-xl font-semibold">InboxVetter</h1>
+        <div>
+          <h1 class="text-xl font-semibold">InboxVetter</h1>
+          <p class="text-xs text-slate-500" id="planBadge">Loading plan…</p>
+        </div>
       </div>
       <div class="flex items-center gap-4">
         <span id="welcome" class="hidden sm:inline text-sm text-slate-600">Welcome, …</span>
@@ -26,27 +29,41 @@
   </header>
 
   <!-- Content -->
-  <main class="max-w-6xl mx-auto px-4 py-6">
-    <div class="mb-4 flex items-center justify-between">
-      <h2 class="text-lg font-semibold">Reports</h2>
-      <div class="flex items-center gap-2">
-        <label for="sort" class="text-sm text-slate-600">Sort by</label>
-        <select id="sort" class="text-sm border border-slate-300 rounded-lg px-2 py-1 bg-white">
-          <option value="createdAt:desc">Date (newest)</option>
-          <option value="createdAt:asc">Date (oldest)</option>
-          <option value="title:asc">Title (A–Z)</option>
-          <option value="title:desc">Title (Z–A)</option>
-          <option value="status:asc">Status (A–Z)</option>
-          <option value="status:desc">Status (Z–A)</option>
-        </select>
+  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <section class="bg-white border border-slate-200 rounded-xl p-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div>
+        <p class="text-sm text-slate-500">Current plan</p>
+        <p class="text-lg font-semibold" id="planLabel">—</p>
+        <p class="text-xs text-slate-500" id="planStatus">—</p>
       </div>
-    </div>
+      <div class="flex items-center gap-2">
+        <a href="/settings.html" class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Open settings</a>
+        <button id="managePlanBtn" class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500">Manage plan</button>
+      </div>
+    </section>
 
-    <div id="empty" class="hidden bg-white border border-dashed border-slate-300 rounded-xl p-8 text-center text-slate-500">
-      No reports yet.
-    </div>
+    <section>
+      <div class="mb-4 flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Reports</h2>
+        <div class="flex items-center gap-2">
+          <label for="sort" class="text-sm text-slate-600">Sort by</label>
+          <select id="sort" class="text-sm border border-slate-300 rounded-lg px-2 py-1 bg-white">
+            <option value="createdAt:desc">Date (newest)</option>
+            <option value="createdAt:asc">Date (oldest)</option>
+            <option value="title:asc">Title (A–Z)</option>
+            <option value="title:desc">Title (Z–A)</option>
+            <option value="status:asc">Status (A–Z)</option>
+            <option value="status:desc">Status (Z–A)</option>
+          </select>
+        </div>
+      </div>
 
-    <ul id="list" class="grid md:grid-cols-2 gap-4"></ul>
+      <div id="empty" class="hidden bg-white border border-dashed border-slate-300 rounded-xl p-8 text-center text-slate-500">
+        No reports yet.
+      </div>
+
+      <ul id="list" class="grid md:grid-cols-2 gap-4"></ul>
+    </section>
   </main>
 
   <template id="row">
@@ -69,6 +86,7 @@
       try { return new Date(iso).toLocaleString(); } catch { return iso || ''; }
     };
     const titleCase = s => s.replace(/\b([a-z])/g, m => m.toUpperCase());
+    const planName = slug => slug ? titleCase(slug.replace(/[._-]+/g, ' ')) : 'Free';
 
     function firstNameFromProfile(profile) {
       if (profile?.firstName) return profile.firstName;
@@ -92,16 +110,27 @@
 
     async function api(path, opts) {
       const res = await fetch(path, { credentials: 'include', ...opts });
-      if (res.status === 401) { location.href = '/login.html'; return; }
+      if (res.status === 401) { location.href = '/login.html'; return {}; }
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     }
 
+    function describeSubscription(sub) {
+      if (!sub) return 'Subscription inactive';
+      const status = titleCase((sub.status || 'inactive').replace(/[._-]+/g, ' '));
+      if (!sub.renewsAt) return `${status} • ${planName(sub.plan)} plan`;
+      return `${status} • Renews ${fmtDate(sub.renewsAt)}`;
+    }
+
     async function main() {
       // Current user
-      const me = await api('/api/me');
+      const meResp = await api('/api/me');
+      const me = meResp.user || {};
       document.getElementById('welcome').textContent = `Welcome, ${firstNameFromProfile(me)}!`;
       document.getElementById('welcome').classList.remove('hidden');
+      document.getElementById('planBadge').textContent = `${planName(me.subscription?.plan || me.plan)} plan`;
+      document.getElementById('planLabel').textContent = planName(me.subscription?.plan || me.plan);
+      document.getElementById('planStatus').textContent = describeSubscription(me.subscription);
       if (me.picture) {
         const img = document.getElementById('avatar');
         img.src = me.picture; img.classList.remove('hidden');
@@ -115,9 +144,13 @@
       document.getElementById('settingsBtn').addEventListener('click', () => {
         location.href = '/settings.html';
       });
+      document.getElementById('managePlanBtn').addEventListener('click', () => {
+        location.href = '/settings.html#subscription';
+      });
 
       // Reports
-      let reports = await api('/api/reports');
+      const reportsResp = await api('/api/reports');
+      let reports = (reportsResp && reportsResp.reports) || [];
       const list = document.getElementById('list');
       const empty = document.getElementById('empty');
       const rowTpl = document.getElementById('row');
@@ -134,9 +167,9 @@
           const el = rowTpl.content.cloneNode(true);
           el.querySelector('h3').textContent = r.title || r.id;
           el.querySelector('p:nth-of-type(1)').textContent = r.description || r.snippet || '';
-          el.querySelector('p:nth-of-type(2)').textContent = `Status: ${r.status || 'unknown'} • ${fmtDate(r.createdAt)}`;
+          el.querySelector('p:nth-of-type(2)').textContent = `Status: ${titleCase((r.status || 'unknown').replace(/[._-]+/g, ' '))} • ${fmtDate(r.createdAt)}`;
           const a = el.querySelector('a');
-          a.href = `/api/reports/${encodeURIComponent(r.id)}`; // could be replaced with pretty page later
+          a.href = `/api/reports/${encodeURIComponent(r.id)}`;
           list.appendChild(el);
         }
       }
