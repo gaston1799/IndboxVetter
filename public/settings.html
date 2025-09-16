@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Settings</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <header class="w-full bg-white border-b border-slate-200">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+      <h1 class="text-xl font-semibold">Settings</h1>
+      <a href="/dashboard.html" class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Back to Dashboard</a>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 py-6">
+    <form id="form" class="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">OpenAI API Key</label>
+        <input name="openaiKey" type="password" class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="sk-..." />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Stripe Secret Key</label>
+        <input name="stripeKey" type="password" class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="sk_live_..." />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Webhook Signing Secret</label>
+        <input name="webhookSecret" type="password" class="w-full border border-slate-300 rounded-lg px-3 py-2" />
+      </div>
+
+      <button class="mt-2 inline-flex items-center text-sm px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500">Save</button>
+    </form>
+  </main>
+
+  <script>
+    async function api(path, opts) {
+      const res = await fetch(path, { credentials: 'include', ...opts });
+      if (res.status === 401) { location.href = '/login.html'; return; }
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    async function main() {
+      const form = document.getElementById('form');
+      // Load current settings
+      const current = await api('/api/settings');
+      for (const [k,v] of Object.entries(current || {})) {
+        const el = form.elements.namedItem(k);
+        if (el) el.value = v || '';
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(form).entries());
+        await api('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        alert('Saved!');
+      });
+    }
+    main().catch(err => {
+      console.error(err);
+      alert('Failed to load settings: ' + err.message);
+    });
+  </script>
+</body>
+</html>

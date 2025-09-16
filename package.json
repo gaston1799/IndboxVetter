@@ -1,0 +1,20 @@
+{
+  "name": "inboxvetter",
+  "version": "1.0.0",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "NODE_ENV=development node server.js"
+  },
+  "dependencies": {
+    "cookie-session": "^2.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "express-session": "^1.18.2",
+    "google-auth-library": "^9.14.2",
+    "openai": "^4.57.0",
+    "stripe": "^16.12.0"
+  }
+}

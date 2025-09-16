@@ -1,0 +1,31 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>InboxVetter — Sign in</title>
+<link rel="stylesheet" href="/style.css"/>
+<script src="/config.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head><body>
+  <div class="card" style="text-align:center">
+    <h1>InboxVetter</h1>
+    <p>Sign in with Google to continue.</p>
+    <div id="gbtn" style="display:inline-block;margin-top:14px"></div>
+    <p class="status" style="margin-top:14px">Local demo · your settings live in sessionStorage.</p>
+  </div>
+
+<script>
+function postJSON(u,d){return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(r=>r.json())}
+window.onload=function(){
+  const cid = (window.INBOXVETTER_CONFIG||{}).GOOGLE_CLIENT_ID;
+  if(!cid){alert("Missing GOOGLE_CLIENT_ID");return;}
+  google.accounts.id.initialize({
+    client_id: cid,
+    callback: async (resp) => {
+      const r = await postJSON("/auth/google", { credential: resp.credential });
+      if (r.ok) location.href = "/setup.html";
+      else alert("Sign-in failed: " + (r.error || "unknown"));
+    }
+  });
+  google.accounts.id.renderButton(document.getElementById("gbtn"), { theme:"filled_black", size:"large", shape:"pill" });
+};
+</script>
+</body></html>

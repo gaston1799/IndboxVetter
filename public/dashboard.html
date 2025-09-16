@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <!-- Top bar -->
+  <header class="w-full bg-white border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-8 w-8 rounded-xl bg-indigo-600"></div>
+        <h1 class="text-xl font-semibold">InboxVetter</h1>
+      </div>
+      <div class="flex items-center gap-4">
+        <span id="welcome" class="hidden sm:inline text-sm text-slate-600">Welcome, …</span>
+        <button id="settingsBtn" class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Settings</button>
+        <div class="flex items-center gap-2">
+          <img id="avatar" class="h-8 w-8 rounded-full object-cover hidden" alt="avatar" />
+          <button id="logoutBtn" class="text-sm px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800">Log out</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Content -->
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    <div class="mb-4 flex items-center justify-between">
+      <h2 class="text-lg font-semibold">Reports</h2>
+      <div class="flex items-center gap-2">
+        <label for="sort" class="text-sm text-slate-600">Sort by</label>
+        <select id="sort" class="text-sm border border-slate-300 rounded-lg px-2 py-1 bg-white">
+          <option value="createdAt:desc">Date (newest)</option>
+          <option value="createdAt:asc">Date (oldest)</option>
+          <option value="title:asc">Title (A–Z)</option>
+          <option value="title:desc">Title (Z–A)</option>
+          <option value="status:asc">Status (A–Z)</option>
+          <option value="status:desc">Status (Z–A)</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="empty" class="hidden bg-white border border-dashed border-slate-300 rounded-xl p-8 text-center text-slate-500">
+      No reports yet.
+    </div>
+
+    <ul id="list" class="grid md:grid-cols-2 gap-4"></ul>
+  </main>
+
+  <template id="row">
+    <li class="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-sm transition">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h3 class="font-medium text-slate-900 line-clamp-1"></h3>
+          <p class="mt-1 text-sm text-slate-600"></p>
+          <p class="mt-1 text-xs text-slate-500"></p>
+        </div>
+        <a class="inline-flex items-center text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500"
+           target="_blank" rel="noopener">View</a>
+      </div>
+    </li>
+  </template>
+
+  <script>
+    // Helpers
+    const fmtDate = iso => {
+      try { return new Date(iso).toLocaleString(); } catch { return iso || ''; }
+    };
+    const titleCase = s => s.replace(/\b([a-z])/g, m => m.toUpperCase());
+
+    function firstNameFromProfile(profile) {
+      if (profile?.firstName) return profile.firstName;
+      if (profile?.name) return profile.name.split(' ')[0];
+      if (profile?.email) {
+        const raw = profile.email.split('@')[0].replace(/[._-]+/g, ' ');
+        return titleCase(raw.split(' ')[0] || 'Friend');
+      }
+      return 'Friend';
+    }
+
+    function sortReports(arr, key, dir) {
+      const m = dir === 'desc' ? -1 : 1;
+      return arr.slice().sort((a,b) => {
+        const av = (a[key] ?? '').toString().toLowerCase();
+        const bv = (b[key] ?? '').toString().toLowerCase();
+        if (key === 'createdAt') return (new Date(a.createdAt) - new Date(b.createdAt)) * m;
+        return av < bv ? -1*m : av > bv ? 1*m : 0;
+      });
+    }
+
+    async function api(path, opts) {
+      const res = await fetch(path, { credentials: 'include', ...opts });
+      if (res.status === 401) { location.href = '/login.html'; return; }
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    async function main() {
+      // Current user
+      const me = await api('/api/me');
+      document.getElementById('welcome').textContent = `Welcome, ${firstNameFromProfile(me)}!`;
+      document.getElementById('welcome').classList.remove('hidden');
+      if (me.picture) {
+        const img = document.getElementById('avatar');
+        img.src = me.picture; img.classList.remove('hidden');
+      }
+
+      // Events
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
+        location.href = '/login.html';
+      });
+      document.getElementById('settingsBtn').addEventListener('click', () => {
+        location.href = '/settings.html';
+      });
+
+      // Reports
+      let reports = await api('/api/reports');
+      const list = document.getElementById('list');
+      const empty = document.getElementById('empty');
+      const rowTpl = document.getElementById('row');
+
+      function render() {
+        const [key, dir] = document.getElementById('sort').value.split(':');
+        const sorted = sortReports(reports, key, dir);
+        list.innerHTML = '';
+        if (!sorted.length) {
+          empty.classList.remove('hidden'); return;
+        }
+        empty.classList.add('hidden');
+        for (const r of sorted) {
+          const el = rowTpl.content.cloneNode(true);
+          el.querySelector('h3').textContent = r.title || r.id;
+          el.querySelector('p:nth-of-type(1)').textContent = r.description || r.snippet || '';
+          el.querySelector('p:nth-of-type(2)').textContent = `Status: ${r.status || 'unknown'} • ${fmtDate(r.createdAt)}`;
+          const a = el.querySelector('a');
+          a.href = `/api/reports/${encodeURIComponent(r.id)}`; // could be replaced with pretty page later
+          list.appendChild(el);
+        }
+      }
+
+      document.getElementById('sort').addEventListener('change', render);
+      render();
+    }
+
+    main().catch(err => {
+      console.error(err);
+      alert('Failed to load dashboard: ' + err.message);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "users": [
+    {
+      "id": "102067202281403246957",
+      "email": "naquangaston@gmail.com",
+      "name": "WOLF GAMING",
+      "picture": "https://lh3.googleusercontent.com/a/ACg8ocI88RUEEvtV233_TfEkfCS-GyelT-r9R_j0MQr6z3wNJL_L0dqr=s96-c",
+      "plan": "free",
+      "credits": 0
+    },
+    {
+      "id": "102168417252210768965",
+      "email": "videokeysbinds7@gmail.com",
+      "name": "Content [dot]com",
+      "picture": "https://lh3.googleusercontent.com/a/ACg8ocIloT-16NrAICrbWoWZHNxvWXvF42R2DnaWgPRQnacTH_H0uUk=s96-c",
+      "plan": "free",
+      "credits": 0
+    }
+  ]
+}
