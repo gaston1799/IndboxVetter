@@ -1,10 +1,42 @@
-const express = require("express");
-const router = express.Router();
+const {
+  getSubscription: getSubscriptionFromStore,
+  updateSubscription: updateSubscriptionInStore,
+} = require("../config/db");
 const { stripe, WEBHOOK_SECRET } = require("../config/stripe");
-const { updateSubscription: updateSubscriptionInStore } = require("../config/db");
 
-// Stripe webhook route
-router.post("/webhook", express.raw({ type: "application/json" }), (req, res) => {
+function ensureEmail(req, res) {
+  const email = req.session?.user?.email;
+  if (!email) {
+    res.status(401).json({ ok: false, error: "Not authenticated" });
+    return null;
+  }
+  return email;
+}
+
+exports.getSubscription = (req, res) => {
+  const email = ensureEmail(req, res);
+  if (!email) return;
+
+  const subscription = getSubscriptionFromStore(email);
+  res.json({ ok: true, subscription });
+};
+
+exports.updateSubscription = (req, res) => {
+  const email = ensureEmail(req, res);
+  if (!email) return;
+
+  const updates = req.body || {};
+  const subscription = updateSubscriptionInStore(email, updates);
+
+  if (!subscription) {
+    res.status(404).json({ ok: false, error: "User not found" });
+    return;
+  }
+
+  res.json({ ok: true, subscription });
+};
+
+exports.handleStripeWebhook = (req, res) => {
   const sig = req.headers["stripe-signature"];
   let event;
 
@@ -20,7 +52,6 @@ router.post("/webhook", express.raw({ type: "application/json" }), (req, res) =>
       const session = event.data.object;
       const email = session.customer_email;
 
-      // Mark the user as PRO in DB
       if (email) {
         const subscription = updateSubscriptionInStore(email, {
           plan: "pro",
@@ -34,7 +65,8 @@ router.post("/webhook", express.raw({ type: "application/json" }), (req, res) =>
 
     case "customer.subscription.deleted": {
       const subscription = event.data.object;
-      const email = subscription.customer_email; // may need lookup by customer ID
+      const email = subscription.customer_email;
+
       if (email) {
         updateSubscriptionInStore(email, {
           plan: "free",
@@ -48,12 +80,12 @@ router.post("/webhook", express.raw({ type: "application/json" }), (req, res) =>
     case "invoice.payment_failed": {
       const subscription = event.data.object;
       console.log("⚠️ Payment failed for sub:", subscription.id);
-      // (Optional: downgrade or warn user if payment fails)
       break;
     }
+
+    default:
+      console.log("ℹ️ Unhandled Stripe event:", event.type);
   }
 
   res.json({ received: true });
-});
-
-module.exports = router;
+};
