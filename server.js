@@ -58,8 +58,20 @@ app.use(express.static(PUB));
 app.get(["/", "/login", "/login.html"], (_, res) =>
   res.sendFile(path.join(PUB, "login.html"))
 );
+app.get(["/policy", "/policy.html"], (_, res) =>
+  res.sendFile(path.join(PUB, "policy.html"))
+);
+app.get(["/tos", "/terms", "/tos.html"], (_, res) =>
+  res.sendFile(path.join(PUB, "tos.html"))
+);
 app.get(["/setup", "/setup.html"], (_, res) =>
   res.redirect(301, "/settings.html")
+);
+app.get(["/checkout", "/checkout.html"], (_, res) =>
+  res.sendFile(path.join(PUB, "checkout.html"))
+);
+app.get(["/devtest", "/devtest.html"], (_, res) =>
+  res.sendFile(path.join(PUB, "devtest.html"))
 );
 
 // Protected pages (must be logged in)

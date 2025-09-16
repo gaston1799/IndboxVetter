@@ -8,7 +8,13 @@ async function verifyIdToken(idToken) {
     audience: GOOGLE_CLIENT_ID
   });
   const p = ticket.getPayload();
-  return { sub: p.sub, email: p.email, name: p.name, picture: p.picture };
+  return {
+    sub: p.sub,
+    email: p.email,
+    name: p.name,
+    picture: p.picture,
+    exp: p.exp, // seconds since epoch
+  };
 }
 
 module.exports = { verifyIdToken };

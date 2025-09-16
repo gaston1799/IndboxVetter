@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Checkout • InboxVetter</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html[data-theme="dark"] body { background-color: #0f172a; color: #e2e8f0; }
+    html[data-theme="dark"] .card { background-color: #0b1220; border-color: #1f2937; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div class="max-w-3xl mx-auto px-4 py-10">
+    <h1 class="text-2xl font-semibold mb-6">Choose a Plan</h1>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="card border border-slate-200 rounded-xl p-6">
+        <h2 class="font-semibold">Basic</h2>
+        <p class="text-sm text-slate-500 mt-2">Adds tags and routes emails to the right folder (scam, important, spam, or both).</p>
+        <button data-plan="basic" class="mt-4 inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 text-sm">Start Checkout</button>
+      </div>
+      <div class="card border border-slate-200 rounded-xl p-6">
+        <h2 class="font-semibold">Pro</h2>
+        <p class="text-sm text-slate-500 mt-2">In progress: automatically deletes spam and scams to free up space.</p>
+        <button data-plan="pro" class="mt-4 inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 text-sm">Start Checkout</button>
+      </div>
+    </div>
+    <p id="status" class="text-sm text-slate-500 mt-4"></p>
+    <p class="text-sm mt-6">Or use the <a href="/devtest.html" class="text-indigo-600">DevTest checkout</a>.</p>
+  </div>
+
+  <script>
+    (function initTheme() {
+      const stored = localStorage.getItem('iv-theme');
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = stored || (prefersDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
+    })();
+
+    const statusEl = document.getElementById('status');
+    async function startCheckout(plan) {
+      statusEl.textContent = 'Creating session…';
+      try {
+        const res = await fetch('/billing/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ plan })
+        });
+        if (res.status === 401) { location.href = '/login.html'; return; }
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Unknown error');
+        location.href = data.url;
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = err.message;
+      }
+    }
+
+    document.querySelectorAll('button[data-plan]').forEach(btn => {
+      btn.addEventListener('click', () => startCheckout(btn.getAttribute('data-plan')));
+    });
+  </script>
+</body>
+</html>
+

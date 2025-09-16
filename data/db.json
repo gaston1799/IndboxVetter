@@ -45,10 +45,38 @@
         "maxAttachmentMB": 5,
         "maxImages": 3,
         "maxPdfTextChars": 4000,
-        "model": "gpt-4.1-mini"
+        "model": "gpt-5"
       }
     }
   ],
-  "reports": [],
+  "reports": [
+    {
+      "id": "demo-videokeysbinds7@gmail.com-1",
+      "email": "videokeysbinds7@gmail.com",
+      "createdAt": "2025-09-16T20:29:54.001Z",
+      "title": "Sponsorship inquiry from Flowgear",
+      "description": "Flowgear wants to collaborate on a sponsored tutorial series.",
+      "status": "needs_review",
+      "snippet": "We're big fans of your channel and would love to work together on a 3-part automation series..."
+    },
+    {
+      "id": "demo-videokeysbinds7@gmail.com-2",
+      "email": "videokeysbinds7@gmail.com",
+      "createdAt": "2025-09-16T17:29:54.001Z",
+      "title": "Payment received from CreatorStack",
+      "description": "Monthly affiliate payout processed successfully.",
+      "status": "completed",
+      "snippet": "Your CreatorStack balance was paid out to your bank ending in 9901."
+    },
+    {
+      "id": "demo-videokeysbinds7@gmail.com-3",
+      "email": "videokeysbinds7@gmail.com",
+      "createdAt": "2025-09-16T14:29:54.001Z",
+      "title": "Security alert from Proton Mail",
+      "description": "New login detected from Frankfurt, Germany.",
+      "status": "urgent",
+      "snippet": "We noticed a new sign-in on your InboxVetter account from a Chrome browser in Frankfurt."
+    }
+  ],
   "transactions": []
 }

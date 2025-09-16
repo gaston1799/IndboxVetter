@@ -3,6 +3,8 @@ const {
   updateSubscription: updateSubscriptionInStore,
 } = require("../config/db");
 const { stripe, WEBHOOK_SECRET } = require("../config/stripe");
+const PRICE_BASIC = process.env.STRIPE_PRICE_ID;
+const PRICE_PRO = process.env.STRIPE_PRICE_ID_PREMIUM;
 
 function ensureEmail(req, res) {
   const email = req.session?.user?.email;
@@ -34,6 +36,30 @@ exports.updateSubscription = (req, res) => {
   }
 
   res.json({ ok: true, subscription });
+};
+
+exports.startCheckout = async (req, res) => {
+  const email = ensureEmail(req, res);
+  if (!email) return;
+
+  try {
+    const plan = (req.body?.plan || '').toLowerCase();
+    const price = plan === 'pro' ? PRICE_PRO : PRICE_BASIC;
+    if (!price) return res.status(400).json({ ok: false, error: 'Price not configured' });
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer_email: email,
+      line_items: [{ price, quantity: 1 }],
+      success_url: `${req.protocol}://${req.get('host')}/settings.html?success=1`,
+      cancel_url: `${req.protocol}://${req.get('host')}/settings.html?canceled=1`,
+    });
+
+    res.json({ ok: true, url: session.url, id: session.id });
+  } catch (err) {
+    console.error('Checkout error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 };
 
 exports.handleStripeWebhook = (req, res) => {
