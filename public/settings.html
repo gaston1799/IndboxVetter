@@ -8,60 +8,286 @@
 </head>
 <body class="bg-slate-50 text-slate-900">
   <header class="w-full bg-white border-b border-slate-200">
-    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-      <h1 class="text-xl font-semibold">Settings</h1>
-      <a href="/dashboard.html" class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Back to Dashboard</a>
+    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="h-8 w-8 rounded-xl bg-indigo-600"></div>
+        <div>
+          <h1 class="text-xl font-semibold">Settings</h1>
+          <p class="text-xs text-slate-500" id="userEmail">—</p>
+        </div>
+      </div>
+      <a href="/dashboard.html" class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Back to dashboard</a>
     </div>
   </header>
 
-  <main class="max-w-3xl mx-auto px-4 py-6">
-    <form id="form" class="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
-      <div>
-        <label class="block text-sm font-medium mb-1">OpenAI API Key</label>
-        <input name="openaiKey" type="password" class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="sk-..." />
+  <main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+    <section id="subscription" class="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+      <div class="flex flex-col gap-1">
+        <h2 class="text-lg font-semibold">Subscription</h2>
+        <p class="text-sm text-slate-500" id="subscriptionSummary">Loading…</p>
       </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">Stripe Secret Key</label>
-        <input name="stripeKey" type="password" class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="sk_live_..." />
-      </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">Webhook Signing Secret</label>
-        <input name="webhookSecret" type="password" class="w-full border border-slate-300 rounded-lg px-3 py-2" />
-      </div>
+      <form id="planForm" class="space-y-4">
+        <fieldset class="grid gap-3 md:grid-cols-3">
+          <label class="border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-indigo-400 transition" data-plan-card>
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-semibold">Free</span>
+              <input type="radio" name="plan" value="free" class="h-4 w-4 text-indigo-600 border-slate-300">
+            </div>
+            <p class="text-sm text-slate-500 mt-2">Manual triage with basic automations.</p>
+            <p class="mt-3 text-sm font-medium">$0</p>
+          </label>
+          <label class="border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-indigo-400 transition" data-plan-card>
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-semibold">Creator</span>
+              <input type="radio" name="plan" value="creator" class="h-4 w-4 text-indigo-600 border-slate-300">
+            </div>
+            <p class="text-sm text-slate-500 mt-2">AI vetting for 2 inboxes and priority routing.</p>
+            <p class="mt-3 text-sm font-medium">$29<span class="text-xs text-slate-500">/mo</span></p>
+          </label>
+          <label class="border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-indigo-400 transition" data-plan-card>
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-semibold">Team</span>
+              <input type="radio" name="plan" value="team" class="h-4 w-4 text-indigo-600 border-slate-300">
+            </div>
+            <p class="text-sm text-slate-500 mt-2">Shared workspace with collaboration tools.</p>
+            <p class="mt-3 text-sm font-medium">$79<span class="text-xs text-slate-500">/mo</span></p>
+          </label>
+        </fieldset>
+        <div class="grid gap-3 md:grid-cols-2 items-end">
+          <label class="block" id="seatsWrapper">
+            <span class="text-sm font-medium text-slate-600">Seats</span>
+            <input type="number" name="seats" id="seatsInput" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2" min="1" value="1">
+          </label>
+          <div class="flex gap-2 md:justify-end">
+            <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 text-sm">Update plan</button>
+            <span id="planStatusMessage" class="text-sm text-slate-500 self-center"></span>
+          </div>
+        </div>
+      </form>
+    </section>
 
-      <button class="mt-2 inline-flex items-center text-sm px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500">Save</button>
-    </form>
+    <section class="bg-white border border-slate-200 rounded-xl p-6 space-y-5">
+      <div>
+        <h2 class="text-lg font-semibold">Preferences</h2>
+        <p class="text-sm text-slate-500">These settings are stored server-side so you can pick up where you left off from any device.</p>
+      </div>
+      <form id="preferencesForm" class="space-y-5">
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="block">
+            <span class="text-sm font-medium text-slate-600">OpenAI API key</span>
+            <input type="password" name="openaiKey" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="sk-...">
+            <span class="block mt-1 text-xs text-slate-500">Used for outbound vetting. Stored encrypted in the local JSON store.</span>
+          </label>
+          <label class="block">
+            <span class="text-sm font-medium text-slate-600">Omitted senders (comma separated)</span>
+            <input type="text" name="omittedSenders" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="streamelements.com, noreply@paypal.com">
+          </label>
+        </div>
+
+        <label class="block">
+          <span class="text-sm font-medium text-slate-600">What's important to you?</span>
+          <textarea name="importantDesc" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2" rows="4" placeholder="Sponsors, payments, security, school admin"></textarea>
+        </label>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="block">
+            <span class="text-sm font-medium text-slate-600">Allow attachments</span>
+            <input type="checkbox" name="allowAttachments" class="mt-2 h-4 w-4 text-indigo-600 border-slate-300">
+          </label>
+          <label class="block">
+            <span class="text-sm font-medium text-slate-600">Max attachment size (MB)</span>
+            <input type="number" name="maxAttachmentMB" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2" min="1" step="1">
+          </label>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-3">
+          <label class="block">
+            <span class="text-sm font-medium text-slate-600">Max images per message</span>
+            <input type="number" name="maxImages" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2" min="0" step="1">
+          </label>
+          <label class="block md:col-span-2">
+            <span class="text-sm font-medium text-slate-600">Max PDF text characters</span>
+            <input type="number" name="maxPdfTextChars" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2" min="500" step="100">
+          </label>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="block">
+            <span class="text-sm font-medium text-slate-600">Default model</span>
+            <select name="modelSelect" id="modelSelect" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2">
+              <option value="">Use app default</option>
+              <option value="gpt-4.1-mini">gpt-4.1-mini (recommended)</option>
+              <option value="gpt-4.1">gpt-4.1</option>
+              <option value="gpt-5">gpt-5 (reasoning)</option>
+              <option value="o3-mini">o3-mini (reasoning, budget)</option>
+              <option value="o3">o3</option>
+              <option value="gpt-4o-mini">gpt-4o-mini (vision)</option>
+              <option value="gpt-4o">gpt-4o</option>
+              <option value="__custom">Custom…</option>
+            </select>
+          </label>
+          <label class="block" id="customModelWrap" style="display:none">
+            <span class="text-sm font-medium text-slate-600">Custom model ID</span>
+            <input type="text" name="customModel" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="text-your-model">
+          </label>
+        </div>
+
+        <div class="flex items-center justify-between gap-3">
+          <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 text-sm">Save preferences</button>
+          <span id="preferencesStatus" class="text-sm text-slate-500"></span>
+        </div>
+      </form>
+    </section>
   </main>
 
   <script>
+    const planForm = document.getElementById('planForm');
+    const seatsInput = document.getElementById('seatsInput');
+    const seatsWrapper = document.getElementById('seatsWrapper');
+    const planCards = Array.from(document.querySelectorAll('[data-plan-card]'));
+    const planStatusMessage = document.getElementById('planStatusMessage');
+    const subscriptionSummary = document.getElementById('subscriptionSummary');
+    const preferencesForm = document.getElementById('preferencesForm');
+    const preferencesStatus = document.getElementById('preferencesStatus');
+    const modelSelect = document.getElementById('modelSelect');
+    const customModelWrap = document.getElementById('customModelWrap');
+
+    const titleCase = (s) => s.replace(/\b([a-z])/g, m => m.toUpperCase());
+    const planName = (slug) => slug ? titleCase(slug.replace(/[._-]+/g, ' ')) : 'Free';
+    const fmtDate = (iso) => {
+      if (!iso) return '—';
+      try { return new Date(iso).toLocaleString(); } catch { return iso; }
+    };
+
+    function selectPlan(plan) {
+      planCards.forEach((card) => {
+        const input = card.querySelector('input[type="radio"]');
+        const active = input.value === plan;
+        input.checked = active;
+        card.classList.toggle('border-indigo-500', active);
+        card.classList.toggle('shadow-sm', active);
+      });
+      const isTeam = plan === 'team';
+      seatsWrapper.style.display = isTeam ? '' : 'none';
+      seatsInput.disabled = !isTeam;
+    }
+
+    modelSelect.addEventListener('change', () => {
+      customModelWrap.style.display = modelSelect.value === '__custom' ? '' : 'none';
+    });
+
+    selectPlan('free');
+
     async function api(path, opts) {
       const res = await fetch(path, { credentials: 'include', ...opts });
-      if (res.status === 401) { location.href = '/login.html'; return; }
+      if (res.status === 401) { location.href = '/login.html'; return {}; }
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     }
 
-    async function main() {
-      const form = document.getElementById('form');
-      // Load current settings
-      const current = await api('/api/settings');
-      for (const [k,v] of Object.entries(current || {})) {
-        const el = form.elements.namedItem(k);
-        if (el) el.value = v || '';
+    function updateSubscriptionUI(subscription) {
+      if (!subscription) return;
+      const summary = `${planName(subscription.plan)} • ${titleCase((subscription.status || 'inactive').replace(/[._-]+/g, ' '))}`;
+      subscriptionSummary.textContent = subscription.renewsAt
+        ? `${summary} • Renews ${fmtDate(subscription.renewsAt)}`
+        : summary;
+      selectPlan(subscription.plan || 'free');
+      seatsInput.value = subscription.seats || 1;
+      planStatusMessage.textContent = '';
+    }
+
+    async function bootstrap() {
+      const meResp = await api('/api/me');
+      const me = meResp.user || {};
+      document.getElementById('userEmail').textContent = me.email || '—';
+
+      const settingsResp = await api('/api/settings');
+      const settings = settingsResp.settings || {};
+      preferencesForm.openaiKey.value = settings.openaiKey || '';
+      preferencesForm.omittedSenders.value = settings.omittedSenders || '';
+      preferencesForm.importantDesc.value = settings.importantDesc || '';
+      preferencesForm.allowAttachments.checked = settings.allowAttachments ?? true;
+      preferencesForm.maxAttachmentMB.value = settings.maxAttachmentMB ?? 5;
+      preferencesForm.maxImages.value = settings.maxImages ?? 3;
+      preferencesForm.maxPdfTextChars.value = settings.maxPdfTextChars ?? 4000;
+      const known = new Set(['', 'gpt-4.1-mini', 'gpt-4.1', 'gpt-5', 'o3-mini', 'o3', 'gpt-4o-mini', 'gpt-4o']);
+      const model = (settings.model || '').trim();
+      if (known.has(model)) {
+        modelSelect.value = model;
+        customModelWrap.style.display = 'none';
+        preferencesForm.customModel.value = '';
+      } else if (model) {
+        modelSelect.value = '__custom';
+        customModelWrap.style.display = '';
+        preferencesForm.customModel.value = model;
+      } else {
+        modelSelect.value = '';
+        customModelWrap.style.display = 'none';
+        preferencesForm.customModel.value = '';
       }
 
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const data = Object.fromEntries(new FormData(form).entries());
+      const subscriptionResp = await api('/billing/subscription');
+      updateSubscriptionUI(subscriptionResp.subscription);
+    }
+
+    planForm.addEventListener('change', (event) => {
+      if (event.target.name === 'plan') {
+        selectPlan(event.target.value);
+      }
+    });
+
+    planForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const formData = new FormData(planForm);
+      const plan = formData.get('plan') || 'free';
+      const seats = plan === 'team' ? Number(formData.get('seats') || 1) : 1;
+      planStatusMessage.textContent = 'Saving…';
+      try {
+        const resp = await api('/billing/subscription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan, seats }),
+        });
+        updateSubscriptionUI(resp.subscription);
+        planStatusMessage.textContent = 'Plan updated ✓';
+        setTimeout(() => (planStatusMessage.textContent = ''), 2000);
+      } catch (err) {
+        console.error(err);
+        planStatusMessage.textContent = err.message;
+      }
+    });
+
+    preferencesForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      preferencesStatus.textContent = 'Saving…';
+      const modelValue = modelSelect.value === '__custom'
+        ? preferencesForm.customModel.value.trim()
+        : modelSelect.value;
+      const payload = {
+        openaiKey: preferencesForm.openaiKey.value.trim(),
+        omittedSenders: preferencesForm.omittedSenders.value.trim(),
+        importantDesc: preferencesForm.importantDesc.value.trim(),
+        allowAttachments: !!preferencesForm.allowAttachments.checked,
+        maxAttachmentMB: Number(preferencesForm.maxAttachmentMB.value || 5),
+        maxImages: Number(preferencesForm.maxImages.value || 3),
+        maxPdfTextChars: Number(preferencesForm.maxPdfTextChars.value || 4000),
+        model: modelValue,
+      };
+      try {
         await api('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
+          body: JSON.stringify(payload),
         });
-        alert('Saved!');
-      });
-    }
-    main().catch(err => {
+        preferencesStatus.textContent = 'Preferences saved ✓';
+        setTimeout(() => (preferencesStatus.textContent = ''), 2000);
+      } catch (err) {
+        console.error(err);
+        preferencesStatus.textContent = err.message;
+      }
+    });
+
+    bootstrap().catch((err) => {
       console.error(err);
       alert('Failed to load settings: ' + err.message);
     });

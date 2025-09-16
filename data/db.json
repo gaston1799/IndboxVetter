@@ -5,16 +5,50 @@
       "email": "naquangaston@gmail.com",
       "name": "WOLF GAMING",
       "picture": "https://lh3.googleusercontent.com/a/ACg8ocI88RUEEvtV233_TfEkfCS-GyelT-r9R_j0MQr6z3wNJL_L0dqr=s96-c",
-      "plan": "free",
-      "credits": 0
+      "role": "user",
+      "plan": "creator",
+      "subscription": {
+        "plan": "creator",
+        "status": "active",
+        "seats": 1,
+        "renewsAt": "2024-12-01T12:00:00.000Z"
+      },
+      "settings": {
+        "openaiKey": "",
+        "omittedSenders": "",
+        "importantDesc": "",
+        "allowAttachments": true,
+        "maxAttachmentMB": 5,
+        "maxImages": 3,
+        "maxPdfTextChars": 4000,
+        "model": "gpt-4.1-mini"
+      }
     },
     {
       "id": "102168417252210768965",
       "email": "videokeysbinds7@gmail.com",
       "name": "Content [dot]com",
       "picture": "https://lh3.googleusercontent.com/a/ACg8ocIloT-16NrAICrbWoWZHNxvWXvF42R2DnaWgPRQnacTH_H0uUk=s96-c",
+      "role": "user",
       "plan": "free",
-      "credits": 0
+      "subscription": {
+        "plan": "free",
+        "status": "active",
+        "seats": 1,
+        "renewsAt": null
+      },
+      "settings": {
+        "openaiKey": "",
+        "omittedSenders": "",
+        "importantDesc": "",
+        "allowAttachments": true,
+        "maxAttachmentMB": 5,
+        "maxImages": 3,
+        "maxPdfTextChars": 4000,
+        "model": "gpt-4.1-mini"
+      }
     }
-  ]
+  ],
+  "reports": [],
+  "transactions": []
 }

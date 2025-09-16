@@ -52,7 +52,7 @@ app.get(["/", "/login", "/login.html"], (_, res) =>
   res.sendFile(path.join(PUB, "login.html"))
 );
 app.get(["/setup", "/setup.html"], (_, res) =>
-  res.sendFile(path.join(PUB, "setup.html"))
+  res.redirect(301, "/settings.html")
 );
 
 // Protected pages (must be logged in)
