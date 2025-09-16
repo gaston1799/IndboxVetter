@@ -5,8 +5,69 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Settings</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      color-scheme: light;
+    }
+    body[data-theme="dark"] {
+      color-scheme: dark;
+      background-color: #0f172a;
+      color: #e2e8f0;
+    }
+    body[data-theme="dark"] header {
+      background-color: #1e293b !important;
+      border-color: #334155 !important;
+    }
+    body[data-theme="dark"] section {
+      background-color: #1e293b !important;
+      border-color: #334155 !important;
+    }
+    body[data-theme="dark"] .bg-white {
+      background-color: #1e293b !important;
+    }
+    body[data-theme="dark"] .border-slate-200 {
+      border-color: #334155 !important;
+    }
+    body[data-theme="dark"] .border-slate-300 {
+      border-color: #475569 !important;
+    }
+    body[data-theme="dark"] .text-slate-900,
+    body[data-theme="dark"] .text-slate-800,
+    body[data-theme="dark"] .text-slate-700,
+    body[data-theme="dark"] .text-slate-600 {
+      color: #e2e8f0 !important;
+    }
+    body[data-theme="dark"] .text-slate-500 {
+      color: #94a3b8 !important;
+    }
+    body[data-theme="dark"] a {
+      color: #a5b4fc;
+    }
+    body[data-theme="dark"] input,
+    body[data-theme="dark"] select,
+    body[data-theme="dark"] textarea {
+      background-color: #0f172a !important;
+      color: #e2e8f0 !important;
+      border-color: #475569 !important;
+    }
+    body[data-theme="dark"] input::placeholder,
+    body[data-theme="dark"] textarea::placeholder {
+      color: #64748b !important;
+    }
+    body[data-theme="dark"] .plan-card {
+      background-color: #1e293b !important;
+      border-color: #475569 !important;
+    }
+    body[data-theme="dark"] .plan-card[data-active="true"] {
+      border-color: #818cf8 !important;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.35);
+    }
+    body[data-theme="dark"] .hover\:bg-slate-100:hover {
+      background-color: #1e293b !important;
+    }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-900">
+<body data-theme="light" class="bg-slate-50 text-slate-900">
   <header class="w-full bg-white border-b border-slate-200">
     <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-2">
@@ -27,41 +88,33 @@
         <p class="text-sm text-slate-500" id="subscriptionSummary">Loading…</p>
       </div>
       <form id="planForm" class="space-y-4">
-        <fieldset class="grid gap-3 md:grid-cols-3">
-          <label class="border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-indigo-400 transition" data-plan-card>
-            <div class="flex items-center justify-between gap-2">
-              <span class="font-semibold">Free</span>
-              <input type="radio" name="plan" value="free" class="h-4 w-4 text-indigo-600 border-slate-300">
+        <fieldset class="grid gap-3 md:grid-cols-2">
+          <label class="plan-card border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-indigo-400 transition" data-plan-card data-plan="basic">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <span class="font-semibold text-base">Basic</span>
+                <p class="text-xs text-slate-500 mt-1">Automated vetting with managed AI access.</p>
+              </div>
+              <input type="radio" name="plan" value="basic" class="h-4 w-4 text-indigo-600 border-slate-300">
             </div>
-            <p class="text-sm text-slate-500 mt-2">Manual triage with basic automations.</p>
-            <p class="mt-3 text-sm font-medium">$0</p>
+            <p class="mt-4 text-sm font-medium">$4.99<span class="text-xs text-slate-500">/mo</span></p>
+            <p class="mt-2 text-xs text-slate-500">Includes the InboxVetter OpenAI key.</p>
           </label>
-          <label class="border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-indigo-400 transition" data-plan-card>
-            <div class="flex items-center justify-between gap-2">
-              <span class="font-semibold">Creator</span>
-              <input type="radio" name="plan" value="creator" class="h-4 w-4 text-indigo-600 border-slate-300">
+          <label class="plan-card border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-indigo-400 transition" data-plan-card data-plan="test">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <span class="font-semibold text-base">Test plan</span>
+                <p class="text-xs text-slate-500 mt-1">For staging environments and internal QA.</p>
+              </div>
+              <input type="radio" name="plan" value="test" class="h-4 w-4 text-indigo-600 border-slate-300">
             </div>
-            <p class="text-sm text-slate-500 mt-2">AI vetting for 2 inboxes and priority routing.</p>
-            <p class="mt-3 text-sm font-medium">$29<span class="text-xs text-slate-500">/mo</span></p>
-          </label>
-          <label class="border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-indigo-400 transition" data-plan-card>
-            <div class="flex items-center justify-between gap-2">
-              <span class="font-semibold">Team</span>
-              <input type="radio" name="plan" value="team" class="h-4 w-4 text-indigo-600 border-slate-300">
-            </div>
-            <p class="text-sm text-slate-500 mt-2">Shared workspace with collaboration tools.</p>
-            <p class="mt-3 text-sm font-medium">$79<span class="text-xs text-slate-500">/mo</span></p>
+            <p class="mt-4 text-sm font-medium">Test mode</p>
+            <p class="mt-2 text-xs text-slate-500">Uses the InboxVetter OpenAI key.</p>
           </label>
         </fieldset>
-        <div class="grid gap-3 md:grid-cols-2 items-end">
-          <label class="block" id="seatsWrapper">
-            <span class="text-sm font-medium text-slate-600">Seats</span>
-            <input type="number" name="seats" id="seatsInput" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2" min="1" value="1">
-          </label>
-          <div class="flex gap-2 md:justify-end">
-            <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 text-sm">Update plan</button>
-            <span id="planStatusMessage" class="text-sm text-slate-500 self-center"></span>
-          </div>
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 text-sm">Update plan</button>
+          <span id="planStatusMessage" class="text-sm text-slate-500"></span>
         </div>
       </form>
     </section>
@@ -73,16 +126,26 @@
       </div>
       <form id="preferencesForm" class="space-y-5">
         <div class="grid gap-4 md:grid-cols-2">
-          <label class="block">
+          <label class="block" data-openai-field>
             <span class="text-sm font-medium text-slate-600">OpenAI API key</span>
             <input type="password" name="openaiKey" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="sk-...">
-            <span class="block mt-1 text-xs text-slate-500">Used for outbound vetting. Stored encrypted in the local JSON store.</span>
+            <span id="openaiKeyHint" class="block mt-1 text-xs text-slate-500">Used for outbound vetting. Stored encrypted in the local JSON store.</span>
+            <span id="houseKeyNotice" class="block mt-1 text-xs text-indigo-500" style="display:none">InboxVetter manages your OpenAI access on this plan.</span>
           </label>
           <label class="block">
-            <span class="text-sm font-medium text-slate-600">Omitted senders (comma separated)</span>
-            <input type="text" name="omittedSenders" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="streamelements.com, noreply@paypal.com">
+            <span class="text-sm font-medium text-slate-600">Theme</span>
+            <select name="theme" id="themeSelect" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+            <span class="block mt-1 text-xs text-slate-500">Switch between light and dark mode.</span>
           </label>
         </div>
+
+        <label class="block">
+          <span class="text-sm font-medium text-slate-600">Omitted senders (comma separated)</span>
+          <input type="text" name="omittedSenders" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="streamelements.com, noreply@paypal.com">
+        </label>
 
         <label class="block">
           <span class="text-sm font-medium text-slate-600">What's important to you?</span>
@@ -142,8 +205,6 @@
 
   <script>
     const planForm = document.getElementById('planForm');
-    const seatsInput = document.getElementById('seatsInput');
-    const seatsWrapper = document.getElementById('seatsWrapper');
     const planCards = Array.from(document.querySelectorAll('[data-plan-card]'));
     const planStatusMessage = document.getElementById('planStatusMessage');
     const subscriptionSummary = document.getElementById('subscriptionSummary');
@@ -151,32 +212,83 @@
     const preferencesStatus = document.getElementById('preferencesStatus');
     const modelSelect = document.getElementById('modelSelect');
     const customModelWrap = document.getElementById('customModelWrap');
+    const themeSelect = document.getElementById('themeSelect');
+    const openaiInput = preferencesForm.openaiKey;
+    const openaiKeyHint = document.getElementById('openaiKeyHint');
+    const houseKeyNotice = document.getElementById('houseKeyNotice');
 
-    const titleCase = (s) => s.replace(/\b([a-z])/g, m => m.toUpperCase());
-    const planName = (slug) => slug ? titleCase(slug.replace(/[._-]+/g, ' ')) : 'Free';
+    const planLabels = { basic: 'Basic', test: 'Test plan' };
+    const planPricing = { basic: '$4.99/mo', test: 'Test mode' };
+    const HOUSE_KEY_PLANS = new Set(['basic', 'test']);
+
+    let storedOpenaiKey = '';
+    let currentSubscription = null;
+
+    const titleCase = (s) => s.replace(/\b([a-z])/g, (m) => m.toUpperCase());
+    const normalizePlan = (slug) => (slug || '').toLowerCase();
+    const planName = (slug) => planLabels[normalizePlan(slug)] || titleCase(normalizePlan(slug).replace(/[._-]+/g, ' ')) || 'Basic';
+    const usesHousePlan = (plan) => HOUSE_KEY_PLANS.has(normalizePlan(plan));
     const fmtDate = (iso) => {
       if (!iso) return '—';
       try { return new Date(iso).toLocaleString(); } catch { return iso; }
     };
 
+    function applyTheme(theme) {
+      const desired = (theme || '').toLowerCase();
+      const next = desired === 'dark' ? 'dark' : 'light';
+      document.body.dataset.theme = next;
+      if (themeSelect.value !== next) {
+        themeSelect.value = next;
+      }
+    }
+
+    function applyPlanEffects(plan, { managedOverride, preserveInput } = {}) {
+      const normalized = normalizePlan(plan);
+      const managed = managedOverride ?? usesHousePlan(normalized);
+      if (managed) {
+        if (!openaiInput.disabled && openaiInput.value) {
+          storedOpenaiKey = openaiInput.value;
+        }
+        openaiInput.disabled = true;
+        openaiInput.value = '';
+        openaiInput.placeholder = 'Managed by InboxVetter';
+        openaiKeyHint.style.display = 'none';
+        houseKeyNotice.style.display = '';
+      } else {
+        openaiInput.disabled = false;
+        openaiInput.placeholder = 'sk-...';
+        openaiKeyHint.style.display = '';
+        houseKeyNotice.style.display = 'none';
+        if (!preserveInput) {
+          openaiInput.value = storedOpenaiKey || '';
+        }
+      }
+      openaiInput.dataset.managed = managed ? 'true' : 'false';
+      return managed;
+    }
+
     function selectPlan(plan) {
+      const normalized = normalizePlan(plan);
       planCards.forEach((card) => {
+        const cardPlan = normalizePlan(card.dataset.plan || card.querySelector('input[type="radio"]').value);
+        const active = cardPlan === normalized;
         const input = card.querySelector('input[type="radio"]');
-        const active = input.value === plan;
-        input.checked = active;
+        if (input) input.checked = active;
+        card.dataset.active = active ? 'true' : 'false';
         card.classList.toggle('border-indigo-500', active);
         card.classList.toggle('shadow-sm', active);
       });
-      const isTeam = plan === 'team';
-      seatsWrapper.style.display = isTeam ? '' : 'none';
-      seatsInput.disabled = !isTeam;
     }
 
-    modelSelect.addEventListener('change', () => {
+    function handleModelSelectChange() {
       customModelWrap.style.display = modelSelect.value === '__custom' ? '' : 'none';
-    });
+    }
 
-    selectPlan('free');
+    modelSelect.addEventListener('change', handleModelSelectChange);
+    themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
+
+    selectPlan('basic');
+    applyPlanEffects('basic', { preserveInput: true });
 
     async function api(path, opts) {
       const res = await fetch(path, { credentials: 'include', ...opts });
@@ -187,12 +299,16 @@
 
     function updateSubscriptionUI(subscription) {
       if (!subscription) return;
-      const summary = `${planName(subscription.plan)} • ${titleCase((subscription.status || 'inactive').replace(/[._-]+/g, ' '))}`;
-      subscriptionSummary.textContent = subscription.renewsAt
-        ? `${summary} • Renews ${fmtDate(subscription.renewsAt)}`
-        : summary;
-      selectPlan(subscription.plan || 'free');
-      seatsInput.value = subscription.seats || 1;
+      currentSubscription = subscription;
+      const plan = normalizePlan(subscription.plan || 'basic');
+      selectPlan(plan);
+      const managed = applyPlanEffects(plan, { managedOverride: subscription.usesHouseOpenAIKey, preserveInput: true });
+      const statusText = titleCase((subscription.status || 'inactive').replace(/[._-]+/g, ' '));
+      const details = [planName(plan), statusText];
+      if (planPricing[plan]) details.push(planPricing[plan]);
+      if (managed) details.push('InboxVetter key');
+      if (subscription.renewsAt) details.push(`Renews ${fmtDate(subscription.renewsAt)}`);
+      subscriptionSummary.textContent = details.join(' • ');
       planStatusMessage.textContent = '';
     }
 
@@ -203,16 +319,17 @@
 
       const settingsResp = await api('/api/settings');
       const settings = settingsResp.settings || {};
-      preferencesForm.openaiKey.value = settings.openaiKey || '';
+      storedOpenaiKey = settings.openaiKey || '';
       preferencesForm.omittedSenders.value = settings.omittedSenders || '';
       preferencesForm.importantDesc.value = settings.importantDesc || '';
       preferencesForm.allowAttachments.checked = settings.allowAttachments ?? true;
       preferencesForm.maxAttachmentMB.value = settings.maxAttachmentMB ?? 5;
       preferencesForm.maxImages.value = settings.maxImages ?? 3;
       preferencesForm.maxPdfTextChars.value = settings.maxPdfTextChars ?? 4000;
-      const known = new Set(['', 'gpt-4.1-mini', 'gpt-4.1', 'gpt-5', 'o3-mini', 'o3', 'gpt-4o-mini', 'gpt-4o']);
+
+      const knownModels = new Set(['', 'gpt-4.1-mini', 'gpt-4.1', 'gpt-5', 'o3-mini', 'o3', 'gpt-4o-mini', 'gpt-4o']);
       const model = (settings.model || '').trim();
-      if (known.has(model)) {
+      if (knownModels.has(model)) {
         modelSelect.value = model;
         customModelWrap.style.display = 'none';
         preferencesForm.customModel.value = '';
@@ -226,27 +343,37 @@
         preferencesForm.customModel.value = '';
       }
 
+      const usingHouseKey = Boolean(settings.usingHouseOpenAIKey);
+      if (!usingHouseKey) {
+        openaiInput.value = storedOpenaiKey;
+      }
+      applyPlanEffects('basic', { managedOverride: usingHouseKey, preserveInput: true });
+      const theme = settings.theme || 'light';
+      themeSelect.value = theme;
+      applyTheme(theme);
+
       const subscriptionResp = await api('/billing/subscription');
       updateSubscriptionUI(subscriptionResp.subscription);
     }
 
     planForm.addEventListener('change', (event) => {
       if (event.target.name === 'plan') {
-        selectPlan(event.target.value);
+        const selectedPlan = event.target.value;
+        selectPlan(selectedPlan);
+        applyPlanEffects(selectedPlan);
       }
     });
 
     planForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const formData = new FormData(planForm);
-      const plan = formData.get('plan') || 'free';
-      const seats = plan === 'team' ? Number(formData.get('seats') || 1) : 1;
+      const plan = formData.get('plan') || 'basic';
       planStatusMessage.textContent = 'Saving…';
       try {
         const resp = await api('/billing/subscription', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ plan, seats }),
+          body: JSON.stringify({ plan }),
         });
         updateSubscriptionUI(resp.subscription);
         planStatusMessage.textContent = 'Plan updated ✓';
@@ -264,7 +391,6 @@
         ? preferencesForm.customModel.value.trim()
         : modelSelect.value;
       const payload = {
-        openaiKey: preferencesForm.openaiKey.value.trim(),
         omittedSenders: preferencesForm.omittedSenders.value.trim(),
         importantDesc: preferencesForm.importantDesc.value.trim(),
         allowAttachments: !!preferencesForm.allowAttachments.checked,
@@ -272,13 +398,28 @@
         maxImages: Number(preferencesForm.maxImages.value || 3),
         maxPdfTextChars: Number(preferencesForm.maxPdfTextChars.value || 4000),
         model: modelValue,
+        theme: themeSelect.value,
       };
+      if (!openaiInput.disabled) {
+        payload.openaiKey = openaiInput.value.trim();
+      }
       try {
-        await api('/api/settings', {
+        const resp = await api('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
+        const saved = resp.settings || {};
+        if (!openaiInput.disabled) {
+          storedOpenaiKey = openaiInput.value.trim();
+        }
+        applyTheme(saved.theme || themeSelect.value);
+        if (typeof saved.usingHouseOpenAIKey === 'boolean') {
+          applyPlanEffects(currentSubscription?.plan || 'basic', {
+            managedOverride: saved.usingHouseOpenAIKey,
+            preserveInput: true,
+          });
+        }
         preferencesStatus.textContent = 'Preferences saved ✓';
         setTimeout(() => (preferencesStatus.textContent = ''), 2000);
       } catch (err) {

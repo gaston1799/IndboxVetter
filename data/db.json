@@ -6,9 +6,9 @@
       "name": "WOLF GAMING",
       "picture": "https://lh3.googleusercontent.com/a/ACg8ocI88RUEEvtV233_TfEkfCS-GyelT-r9R_j0MQr6z3wNJL_L0dqr=s96-c",
       "role": "user",
-      "plan": "creator",
+      "plan": "basic",
       "subscription": {
-        "plan": "creator",
+        "plan": "basic",
         "status": "active",
         "seats": 1,
         "renewsAt": "2024-12-01T12:00:00.000Z"
@@ -21,7 +21,8 @@
         "maxAttachmentMB": 5,
         "maxImages": 3,
         "maxPdfTextChars": 4000,
-        "model": "gpt-4.1-mini"
+        "model": "gpt-4.1-mini",
+        "theme": "light"
       }
     },
     {
@@ -30,9 +31,9 @@
       "name": "Content [dot]com",
       "picture": "https://lh3.googleusercontent.com/a/ACg8ocIloT-16NrAICrbWoWZHNxvWXvF42R2DnaWgPRQnacTH_H0uUk=s96-c",
       "role": "user",
-      "plan": "free",
+      "plan": "test",
       "subscription": {
-        "plan": "free",
+        "plan": "test",
         "status": "active",
         "seats": 1,
         "renewsAt": null
@@ -45,7 +46,8 @@
         "maxAttachmentMB": 5,
         "maxImages": 3,
         "maxPdfTextChars": 4000,
-        "model": "gpt-4.1-mini"
+        "model": "gpt-4.1-mini",
+        "theme": "light"
       }
     }
   ],

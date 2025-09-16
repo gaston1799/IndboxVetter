@@ -11,6 +11,24 @@ const ADMIN_SET = new Set(
     .filter(Boolean)
 );
 
+const DEFAULT_THEME = "light";
+const VALID_THEMES = new Set(["light", "dark"]);
+const HOUSE_OPENAI_KEY = (process.env.HOUSE_OPENAI_KEY || "").trim();
+
+const PLAN_DEFINITIONS = {
+  basic: { renewalDays: 30, defaultStatus: "active", usesHouseKey: true },
+  test: { renewalDays: null, defaultStatus: "active", usesHouseKey: true },
+};
+
+const LEGACY_PLAN_ALIASES = {
+  free: "basic",
+  creator: "basic",
+  team: "basic",
+  pro: "basic",
+};
+
+const DEFAULT_PLAN = "basic";
+
 const DEFAULT_SETTINGS = {
   openaiKey: "",
   omittedSenders: "",
@@ -20,6 +38,7 @@ const DEFAULT_SETTINGS = {
   maxImages: 3,
   maxPdfTextChars: 4000,
   model: "gpt-4.1-mini",
+  theme: DEFAULT_THEME,
 };
 
 const SAMPLE_REPORTS = [
@@ -42,6 +61,31 @@ const SAMPLE_REPORTS = [
     snippet: "We noticed a new sign-in on your InboxVetter account from a Chrome browser in Frankfurt.",
   },
 ];
+
+function normalizePlan(plan = DEFAULT_PLAN) {
+  const slug = (plan || "").toString().toLowerCase();
+  if (!slug) return DEFAULT_PLAN;
+  if (PLAN_DEFINITIONS[slug]) return slug;
+  if (LEGACY_PLAN_ALIASES[slug]) return LEGACY_PLAN_ALIASES[slug];
+  return DEFAULT_PLAN;
+}
+
+function getPlanDefinition(plan) {
+  const normalized = normalizePlan(plan);
+  return {
+    name: normalized,
+    definition: PLAN_DEFINITIONS[normalized] || PLAN_DEFINITIONS[DEFAULT_PLAN],
+  };
+}
+
+function usesHouseOpenAIPlan(plan) {
+  return getPlanDefinition(plan).definition.usesHouseKey;
+}
+
+function computeRenewalDate(days) {
+  if (!days) return null;
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+}
 
 // Ensure data folder and file exist
 if (!fs.existsSync(DATA_DIR)) {
@@ -77,40 +121,76 @@ function writeDB(db) {
   }
 }
 
-function defaultSubscription(plan = "free") {
-  const base = {
-    plan,
+function defaultSubscription(plan = DEFAULT_PLAN) {
+  const { name, definition } = getPlanDefinition(plan);
+  return {
+    plan: name,
     seats: 1,
+    status: definition.defaultStatus,
+    renewsAt: computeRenewalDate(definition.renewalDays),
   };
+}
+function updateSubscription(email, updates = {}) {
+  const ctx = getUserInternal(email);
+  if (!ctx) return null;
 
-  if (plan === "free") {
-    base.status = "active";
-    base.renewsAt = null;
-  } else {
-    base.status = "trialing";
-    base.renewsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const subscription = ctx.user.subscription || defaultSubscription(ctx.user.plan);
+
+  if (updates.plan) {
+    const { name } = getPlanDefinition(updates.plan);
+    subscription.plan = name;
   }
 
-  return base;
-}
-function updateSubscription(email, data) {
-  const db = readDB();
-  const user = db.users.find(u => u.email === email);
-  if (!user) return null;
+  if (updates.status && typeof updates.status === "string") {
+    subscription.status = updates.status;
+  }
 
-  user.plan = data.plan || user.plan;
-  user.subscription = {
-    ...user.subscription,
-    ...data,
-  };
+  if (updates.seats !== undefined) {
+    const seats = Number(updates.seats);
+    if (!Number.isNaN(seats) && seats > 0) {
+      subscription.seats = Math.round(seats);
+    }
+  }
 
-  writeDB(db);
-  return user.subscription;
+  if (updates.renewsAt !== undefined) {
+    if (!updates.renewsAt) {
+      subscription.renewsAt = null;
+    } else {
+      const date = new Date(updates.renewsAt);
+      if (!Number.isNaN(date.getTime())) {
+        subscription.renewsAt = date.toISOString();
+      }
+    }
+  }
+
+  const planInfo = getPlanDefinition(subscription.plan);
+  if (!subscription.status) {
+    subscription.status = planInfo.definition.defaultStatus;
+  }
+  if (planInfo.definition.renewalDays) {
+    if (!subscription.renewsAt) {
+      subscription.renewsAt = computeRenewalDate(planInfo.definition.renewalDays);
+    }
+  } else {
+    subscription.renewsAt = null;
+  }
+  if (!subscription.seats || subscription.seats < 1) {
+    subscription.seats = 1;
+  }
+
+  ctx.user.plan = subscription.plan;
+  if (usesHouseOpenAIPlan(subscription.plan)) {
+    ctx.user.settings.openaiKey = "";
+  }
+  ctx.user.subscription = subscription;
+  writeDB(ctx.db);
+  return { ...subscription };
 }
 
 function getSubscription(email) {
-  const db = readDB();
-  return db.users.find(u => u.email === email)?.subscription || null;
+  const ctx = getUserInternal(email);
+  if (!ctx) return defaultSubscription();
+  return { ...ctx.user.subscription };
 }
 function applySettingDefaults(settings = {}) {
   const next = { ...DEFAULT_SETTINGS, ...settings };
@@ -125,39 +205,46 @@ function applySettingDefaults(settings = {}) {
   next.maxPdfTextChars = Number.isFinite(Number(next.maxPdfTextChars))
     ? Number(next.maxPdfTextChars)
     : DEFAULT_SETTINGS.maxPdfTextChars;
+  const desiredTheme = (next.theme || "").toString().toLowerCase();
+  next.theme = VALID_THEMES.has(desiredTheme) ? desiredTheme : DEFAULT_THEME;
   return next;
 }
 
 function ensureUserDefaults(user) {
   let changed = false;
-  if (!user.plan) {
-    user.plan = "free";
+  const planInfo = getPlanDefinition(user.plan);
+  if (!user.plan || user.plan !== planInfo.name) {
+    user.plan = planInfo.name;
     changed = true;
   }
+
   if (!user.subscription) {
     user.subscription = defaultSubscription(user.plan);
     changed = true;
   } else {
-    if (!user.subscription.plan) {
-      user.subscription.plan = user.plan || "free";
+    const subscriptionPlanInfo = getPlanDefinition(user.subscription.plan);
+    if (user.subscription.plan !== subscriptionPlanInfo.name) {
+      user.subscription.plan = subscriptionPlanInfo.name;
       changed = true;
     }
     if (!user.subscription.status) {
-      user.subscription.status =
-        user.subscription.plan === "free" ? "active" : "trialing";
+      user.subscription.status = subscriptionPlanInfo.definition.defaultStatus;
       changed = true;
     }
-    if (user.subscription.plan === "free" && user.subscription.renewsAt !== null) {
+
+    if (subscriptionPlanInfo.definition.renewalDays) {
+      if (!user.subscription.renewsAt) {
+        user.subscription.renewsAt = computeRenewalDate(
+          subscriptionPlanInfo.definition.renewalDays
+        );
+        changed = true;
+      }
+    } else if (user.subscription.renewsAt !== null) {
       user.subscription.renewsAt = null;
       changed = true;
     }
-    if (!user.subscription.renewsAt && user.subscription.plan !== "free") {
-      user.subscription.renewsAt = new Date(
-        Date.now() + 30 * 24 * 60 * 60 * 1000
-      ).toISOString();
-      changed = true;
-    }
-    if (!user.subscription.seats) {
+
+    if (!user.subscription.seats || user.subscription.seats < 1) {
       user.subscription.seats = 1;
       changed = true;
     }
@@ -171,6 +258,10 @@ function ensureUserDefaults(user) {
       user.settings = next;
       changed = true;
     }
+  }
+  if (usesHouseOpenAIPlan(user.subscription?.plan) && user.settings.openaiKey) {
+    user.settings.openaiKey = "";
+    changed = true;
   }
   user.plan = user.subscription.plan;
   if (!user.role) {
@@ -208,8 +299,8 @@ function upsertUser({ id, email, name, picture }) {
       name,
       picture,
       role,
-      plan: "free",
-      subscription: defaultSubscription("free"),
+      plan: DEFAULT_PLAN,
+      subscription: defaultSubscription(DEFAULT_PLAN),
       settings: applySettingDefaults(),
     };
     db.users.push(user);
@@ -259,15 +350,27 @@ function listUsers() {
 
 function getSettings(email) {
   const ctx = getUserInternal(email);
-  if (!ctx) return applySettingDefaults();
-  return applySettingDefaults(ctx.user.settings);
+  if (!ctx) {
+    const defaults = applySettingDefaults();
+    defaults.usingHouseOpenAIKey = usesHouseOpenAIPlan(DEFAULT_PLAN);
+    return defaults;
+  }
+  const plan = ctx.user.subscription?.plan || ctx.user.plan;
+  const settings = applySettingDefaults(ctx.user.settings);
+  const managed = usesHouseOpenAIPlan(plan);
+  if (managed) {
+    settings.openaiKey = "";
+  }
+  settings.usingHouseOpenAIKey = managed;
+  return settings;
 }
 
 function updateSettings(email, updates) {
   const ctx = getUserInternal(email);
   if (!ctx) return applySettingDefaults();
+  const plan = ctx.user.subscription?.plan || ctx.user.plan;
+  const usesHouseKey = usesHouseOpenAIPlan(plan);
   const allowed = {
-    openaiKey: "string",
     omittedSenders: "string",
     importantDesc: "string",
     allowAttachments: "boolean",
@@ -275,6 +378,7 @@ function updateSettings(email, updates) {
     maxImages: "number",
     maxPdfTextChars: "number",
     model: "string",
+    theme: "string",
   };
   for (const [key, type] of Object.entries(allowed)) {
     if (!(key in updates)) continue;
@@ -288,63 +392,27 @@ function updateSettings(email, updates) {
       ctx.user.settings[key] = value;
     }
   }
+  if (!usesHouseKey && typeof updates.openaiKey === "string") {
+    ctx.user.settings.openaiKey = updates.openaiKey.trim();
+  }
+  if (usesHouseKey) {
+    ctx.user.settings.openaiKey = "";
+  }
   ctx.user.settings = applySettingDefaults(ctx.user.settings);
+  const result = { ...ctx.user.settings, usingHouseOpenAIKey: usesHouseKey };
   writeDB(ctx.db);
-  return ctx.user.settings;
+  return result;
 }
 
-function getSubscription(email) {
+function getEffectiveOpenAIKey(email) {
   const ctx = getUserInternal(email);
-  if (!ctx) return defaultSubscription("free");
-  ctx.user.subscription = ctx.user.subscription || defaultSubscription(ctx.user.plan);
-  if (ensureUserDefaults(ctx.user)) {
-    writeDB(ctx.db);
+  if (!ctx) return HOUSE_OPENAI_KEY || null;
+  const plan = ctx.user.subscription?.plan || ctx.user.plan;
+  if (usesHouseOpenAIPlan(plan)) {
+    return HOUSE_OPENAI_KEY || null;
   }
-  return ctx.user.subscription;
-}
-
-function updateSubscription(email, updates) {
-  const ctx = getUserInternal(email);
-  if (!ctx) return null;
-  const sub = ctx.user.subscription || defaultSubscription(ctx.user.plan);
-
-  if (updates.plan && typeof updates.plan === "string") {
-    sub.plan = updates.plan;
-  }
-  if (updates.status && typeof updates.status === "string") {
-    sub.status = updates.status;
-  }
-  if (updates.seats !== undefined) {
-    const seats = Number(updates.seats);
-    if (!Number.isNaN(seats) && seats > 0) {
-      sub.seats = Math.round(seats);
-    }
-  }
-  if (updates.renewsAt !== undefined) {
-    if (!updates.renewsAt) {
-      sub.renewsAt = null;
-    } else {
-      const date = new Date(updates.renewsAt);
-      if (!Number.isNaN(date.getTime())) {
-        sub.renewsAt = date.toISOString();
-      }
-    }
-  }
-
-  if (sub.plan === "free") {
-    sub.status = "active";
-    sub.renewsAt = null;
-  } else {
-    if (!sub.status) sub.status = "active";
-    if (!sub.renewsAt) {
-      sub.renewsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    }
-  }
-
-  ctx.user.plan = sub.plan;
-  ctx.user.subscription = sub;
-  writeDB(ctx.db);
-  return ctx.user.subscription;
+  const key = (ctx.user.settings?.openaiKey || "").trim();
+  return key || null;
 }
 
 function seedReportsForUser(db, email) {
@@ -411,10 +479,10 @@ module.exports = {
   updateSettings,
   getSubscription,
   updateSubscription,
+  getEffectiveOpenAIKey,
+  usesHouseOpenAIPlan,
   listReports,
   getReport,
   addTransaction,
   getTransactions,
-  updateSubscription,
-  getSubscription
 };

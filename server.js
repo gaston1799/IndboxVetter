@@ -7,6 +7,7 @@ const express = require("express");
 const cookieSession = require("cookie-session");
 const sessionMiddleware = require("./middleware/authMiddleware");
 const errorHandler = require("./middleware/errorHandler");
+const { handleStripeWebhook } = require("./controllers/billingController");
 
 const app = express();
 const PORT = process.env.PORT || 5173;
@@ -16,6 +17,12 @@ const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret";
 // ───────────────────────────────────────────────────────────────────────────────
 // core middleware
 // ───────────────────────────────────────────────────────────────────────────────
+app.post(
+  "/billing/webhook",
+  express.raw({ type: "application/json" }),
+  handleStripeWebhook
+);
+
 app.use(express.json({ limit: "1mb" }));
 app.use(
   cookieSession({
