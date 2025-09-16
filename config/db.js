@@ -93,7 +93,25 @@ function defaultSubscription(plan = "free") {
 
   return base;
 }
+function updateSubscription(email, data) {
+  const db = readDB();
+  const user = db.users.find(u => u.email === email);
+  if (!user) return null;
 
+  user.plan = data.plan || user.plan;
+  user.subscription = {
+    ...user.subscription,
+    ...data,
+  };
+
+  writeDB(db);
+  return user.subscription;
+}
+
+function getSubscription(email) {
+  const db = readDB();
+  return db.users.find(u => u.email === email)?.subscription || null;
+}
 function applySettingDefaults(settings = {}) {
   const next = { ...DEFAULT_SETTINGS, ...settings };
   // ensure booleans/numbers are typed correctly
@@ -397,4 +415,6 @@ module.exports = {
   getReport,
   addTransaction,
   getTransactions,
+  updateSubscription,
+  getSubscription
 };

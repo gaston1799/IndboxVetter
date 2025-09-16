@@ -3,10 +3,10 @@ REM ==============================
 REM InboxVetter GitHub Push Script
 REM ==============================
 
-REM Navigate to the project folder (edit path if needed)
+REM Navigate to the project folder (this script's folder)
 cd /d "%~dp0"
 
-REM Ensure git is available
+REM Ensure git is installed
 where git >nul 2>nul
 if %ERRORLEVEL% neq 0 (
   echo Git is not installed or not in PATH.
@@ -14,12 +14,31 @@ if %ERRORLEVEL% neq 0 (
   exit /b 1
 )
 
+REM Parse commit message from arguments
+set MESSAGE=
+:parse_args
+if "%~1"=="" goto args_done
+if /i "%~1"=="-m" (
+  shift
+  set MESSAGE=%~1
+  shift
+  goto parse_args
+) else (
+  shift
+  goto parse_args
+)
+:args_done
+
+if "%MESSAGE%"=="" (
+  echo No commit message provided. Use: github.cmd -m "your message"
+  exit /b 1
+)
+
 REM Stage all changes
 git add -A
 
-REM Commit with timestamp message
-set CURRDATE=%date% %time%
-git commit -m "Auto commit on %CURRDATE%"
+REM Commit
+git commit -m "%MESSAGE%"
 
 REM Ensure remote is set
 git remote -v | find "origin" >nul
@@ -32,6 +51,5 @@ git push -u origin main
 
 echo.
 echo ==============================
-echo   Push complete!
+echo   Push complete with message: %MESSAGE%
 echo ==============================
-pause
