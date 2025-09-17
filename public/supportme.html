@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Support InboxVetter</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <header class="w-full bg-white border-b border-slate-200">
+    <div class="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-8 w-8 rounded-xl bg-indigo-600"></div>
+        <div>
+          <h1 class="text-xl font-semibold">InboxVetter</h1>
+          <p class="text-xs text-slate-500">Support the project</p>
+        </div>
+      </div>
+      <a href="/dashboard.html" class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Back to dashboard</a>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 py-10">
+    <section class="bg-white border border-slate-200 rounded-xl p-6 space-y-6">
+      <div>
+        <h2 class="text-2xl font-semibold">Buy us a coffee ☕</h2>
+        <p class="mt-2 text-sm text-slate-600">
+          InboxVetter stays alive thanks to people like you. Choose any amount below and you'll be redirected to Stripe to complete the donation.
+        </p>
+        <p id="supportEmailWrap" class="mt-2 text-xs text-slate-500 hidden">
+          Your donation will be associated with <span id="supportEmail" class="font-medium"></span>.
+        </p>
+      </div>
+
+      <form id="supportForm" class="space-y-4">
+        <div>
+          <label for="amount" class="block text-sm font-medium text-slate-700">Donation amount (USD)</label>
+          <div class="mt-1 relative rounded-lg shadow-sm">
+            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">$</div>
+            <input
+              type="number"
+              id="amount"
+              name="amount"
+              min="1"
+              step="0.01"
+              required
+              inputmode="decimal"
+              placeholder="10.00"
+              class="block w-full rounded-lg border border-slate-300 pl-7 pr-3 py-2 focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+            />
+          </div>
+          <p class="mt-1 text-xs text-slate-500">Minimum donation is $1.00.</p>
+        </div>
+
+        <button
+          type="submit"
+          id="supportSubmit"
+          class="w-full sm:w-auto inline-flex justify-center text-sm font-medium px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        >Donate with Stripe</button>
+
+        <div id="message" class="hidden mt-4 text-sm rounded-lg border px-4 py-3"></div>
+
+        <div id="devTools" class="hidden mt-4">
+          <button
+            type="button"
+            id="devToggle"
+            class="text-xs font-medium text-slate-500 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-slate-300 rounded-md px-2 py-1"
+            aria-expanded="false"
+          >Show developer details</button>
+
+          <div
+            id="devDetails"
+            class="hidden mt-3 space-y-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-600"
+          >
+            <div>
+              <p class="font-semibold text-slate-700">Error message</p>
+              <pre
+                id="devErrorMessage"
+                class="mt-1 whitespace-pre-wrap break-words font-mono text-[11px] text-slate-700"
+              ></pre>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-700">Stack trace</p>
+              <pre
+                id="devStack"
+                class="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] text-slate-700"
+              ></pre>
+            </div>
+            <div id="devPayloadWrap" class="hidden">
+              <p class="font-semibold text-slate-700">Response payload</p>
+              <pre
+                id="devPayload"
+                class="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] text-slate-700"
+              ></pre>
+            </div>
+          </div>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    const messageEl = document.getElementById('message');
+    const messageBaseClass = 'mt-4 text-sm rounded-lg border px-4 py-3';
+    const messageVariants = {
+      success: 'border-green-200 bg-green-50 text-green-700',
+      error: 'border-red-200 bg-red-50 text-red-700',
+      info: 'border-blue-200 bg-blue-50 text-blue-700'
+    };
+
+    const devTools = document.getElementById('devTools');
+    const devToggle = document.getElementById('devToggle');
+    const devDetails = document.getElementById('devDetails');
+    const devErrorMessage = document.getElementById('devErrorMessage');
+    const devStack = document.getElementById('devStack');
+    const devPayloadWrap = document.getElementById('devPayloadWrap');
+    const devPayload = document.getElementById('devPayload');
+    const devToggleLabels = {
+      show: 'Show developer details',
+      hide: 'Hide developer details'
+    };
+
+    function resetDevDetails() {
+      if (!devTools || !devDetails || !devErrorMessage || !devStack || !devPayloadWrap || !devPayload) {
+        return;
+      }
+
+      devTools.classList.add('hidden');
+      devDetails.classList.add('hidden');
+      devErrorMessage.textContent = '';
+      devStack.textContent = '';
+      devPayload.textContent = '';
+      devPayloadWrap.classList.add('hidden');
+
+      if (devToggle) {
+        devToggle.setAttribute('aria-expanded', 'false');
+        devToggle.textContent = devToggleLabels.show;
+      }
+    }
+
+    function revealDevDetails(details = {}) {
+      if (!devTools || !devDetails || !devErrorMessage || !devStack || !devPayloadWrap || !devPayload) {
+        return;
+      }
+
+      devTools.classList.remove('hidden');
+      devDetails.classList.add('hidden');
+
+      if (devToggle) {
+        devToggle.setAttribute('aria-expanded', 'false');
+        devToggle.textContent = devToggleLabels.show;
+      }
+
+      devErrorMessage.textContent = details.message || '(no message provided)';
+      devStack.textContent = details.stack || '(no stack trace available)';
+
+      const payload = details.payload;
+      if (payload && typeof payload === 'object' && Object.keys(payload).length > 0) {
+        devPayloadWrap.classList.remove('hidden');
+        devPayload.textContent = JSON.stringify(payload, null, 2);
+      } else {
+        devPayloadWrap.classList.add('hidden');
+        devPayload.textContent = '';
+      }
+    }
+
+    if (devToggle) {
+      devToggle.addEventListener('click', () => {
+        const expanded = devToggle.getAttribute('aria-expanded') === 'true';
+
+        if (expanded) {
+          devToggle.setAttribute('aria-expanded', 'false');
+          devToggle.textContent = devToggleLabels.show;
+          devDetails.classList.add('hidden');
+        } else {
+          devToggle.setAttribute('aria-expanded', 'true');
+          devToggle.textContent = devToggleLabels.hide;
+          devDetails.classList.remove('hidden');
+        }
+      });
+    }
+
+    function showMessage(type, text, devInfo) {
+      const variant = messageVariants[type] || messageVariants.info;
+      messageEl.className = `${messageBaseClass} ${variant}`;
+      messageEl.textContent = text;
+
+      resetDevDetails();
+
+      if (type === 'error' && devInfo) {
+        revealDevDetails(devInfo);
+      }
+    }
+
+    function hideMessage() {
+      messageEl.className = `${messageBaseClass} hidden`;
+      messageEl.textContent = '';
+      resetDevDetails();
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('success')) {
+      showMessage('success', 'Thank you! Your donation was received successfully.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (params.get('canceled')) {
+      showMessage('error', 'Donation canceled. Feel free to try again whenever you are ready.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      hideMessage();
+    }
+
+    async function fetchProfile() {
+      try {
+        const res = await fetch('/api/me', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const email = data?.user?.email;
+        if (email) {
+          const wrap = document.getElementById('supportEmailWrap');
+          const emailEl = document.getElementById('supportEmail');
+          emailEl.textContent = email;
+          wrap.classList.remove('hidden');
+        }
+      } catch (err) {
+        console.warn('Failed to load profile for donation page:', err);
+      }
+    }
+
+    fetchProfile();
+
+    const form = document.getElementById('supportForm');
+    const amountInput = document.getElementById('amount');
+    const submitBtn = document.getElementById('supportSubmit');
+    const defaultBtnText = submitBtn.textContent;
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const raw = amountInput.value.trim();
+      const amount = Number.parseFloat(raw);
+
+      if (!Number.isFinite(amount) || amount < 1) {
+        showMessage('error', 'Please enter a valid amount of at least $1.00.');
+        return;
+      }
+
+      hideMessage();
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Redirecting…';
+
+      let redirecting = false;
+      let payload = null;
+
+      try {
+        const response = await fetch('/billing/support', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ amount })
+        });
+
+        payload = await response.json().catch(() => ({}));
+
+        if (!response.ok || !payload?.ok || !payload?.url) {
+          const message = payload?.error || 'Unable to start the Stripe checkout session.';
+          const error = new Error(message);
+          error.serverStack = payload?.stack;
+          error.serverPayload = payload;
+          throw error;
+        }
+
+        redirecting = true;
+        window.location.href = payload.url;
+      } catch (err) {
+        const fallbackMessage = 'Unexpected error. Please try again.';
+        const message = err.message || fallbackMessage;
+        const serverPayload = err.serverPayload || payload;
+        const normalizedPayload = serverPayload && typeof serverPayload === 'object' ? serverPayload : null;
+
+        const devInfo = {
+          message: (normalizedPayload && typeof normalizedPayload.error === 'string'
+            ? normalizedPayload.error
+            : message) || fallbackMessage,
+          stack: err.serverStack || (normalizedPayload && normalizedPayload.stack) || err.stack || '',
+          payload: normalizedPayload && Object.keys(normalizedPayload).length > 0 ? normalizedPayload : null,
+        };
+
+        showMessage('error', message, devInfo);
+      } finally {
+        if (!redirecting) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = defaultBtnText;
+        }
+      }
+    });
+  </script>
+</body>
+</html>
