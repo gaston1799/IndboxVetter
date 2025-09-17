@@ -10,6 +10,7 @@ const sessionMiddleware = require("./middleware/authMiddleware");
 const errorHandler = require("./middleware/errorHandler");
 const { handleStripeWebhook } = require("./controllers/billingController");
 const scheduler = require("./services/inboxScheduler");
+const pkg = require("./package.json");
 
 const app = express();
 // Render and other hosting providers terminate TLS before forwarding the request
@@ -32,6 +33,20 @@ if (!SESSION_KEYS.length) {
   SESSION_KEYS.push(crypto.createHash("sha256").update("dev-secret").digest("hex"));
 }
 const SESSION_MAX_AGE_MS = Math.max(1, SESSION_MAX_AGE_DAYS) * 24 * 60 * 60 * 1000;
+const BUILD_COMMIT =
+  process.env.RENDER_GIT_COMMIT ||
+  process.env.GIT_COMMIT ||
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+  "";
+const BUILD_TIME = process.env.BUILD_TIME || new Date().toISOString();
+const PUBLIC_CONFIG = {
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
+  VERSION: pkg.version,
+  BUILD_TIME,
+};
+if (BUILD_COMMIT) {
+  PUBLIC_CONFIG.BUILD_COMMIT = BUILD_COMMIT;
+}
 
 // ───────────────────────────────────────────────────────────────────────────────
 // core middleware
@@ -65,12 +80,12 @@ app.use((req, res, next) => {
 
 // Expose safe public config
 app.get("/config.js", (_, res) => {
+  const payload = JSON.stringify(PUBLIC_CONFIG, null, 2);
   res
     .type("js")
     .send(
-      `window.INBOXVETTER_CONFIG = { GOOGLE_CLIENT_ID: ${JSON.stringify(
-        process.env.GOOGLE_CLIENT_ID || ""
-      )} };`
+      `window.INBOXVETTER_CONFIG = ${payload};\n` +
+        "window.dispatchEvent(new Event('INBOXVETTER_CONFIG_READY'));\n"
     );
 });
 
