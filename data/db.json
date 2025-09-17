@@ -21,7 +21,16 @@
         "maxAttachmentMB": 5,
         "maxImages": 3,
         "maxPdfTextChars": 4000,
-        "model": "gpt-4.1-mini"
+        "model": "gpt-4.1-mini",
+        "safeMode": true,
+        "gmailQuery": "label:inbox",
+        "gmailMaxResults": 200
+      },
+      "integrations": {
+        "gmail": {
+          "connected": false,
+          "updatedAt": null
+        }
       }
     },
     {
@@ -45,7 +54,16 @@
         "maxAttachmentMB": 5,
         "maxImages": 3,
         "maxPdfTextChars": 4000,
-        "model": "gpt-5"
+        "model": "gpt-5",
+        "safeMode": true,
+        "gmailQuery": "label:inbox",
+        "gmailMaxResults": 200
+      },
+      "integrations": {
+        "gmail": {
+          "connected": false,
+          "updatedAt": null
+        }
       }
     },
     {
@@ -69,7 +87,16 @@
         "maxAttachmentMB": 5,
         "maxImages": 3,
         "maxPdfTextChars": 4000,
-        "model": "gpt-4.1-mini"
+        "model": "gpt-4.1-mini",
+        "safeMode": true,
+        "gmailQuery": "label:inbox",
+        "gmailMaxResults": 200
+      },
+      "integrations": {
+        "gmail": {
+          "connected": false,
+          "updatedAt": null
+        }
       }
     }
   ],

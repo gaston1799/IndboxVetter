@@ -156,9 +156,17 @@ function shouldAutoRun(sub) {
   const plan = (sub.plan || "").toLowerCase();
   if (!plan || plan === "free") return false;
   const status = (sub.status || "").toLowerCase();
-  if (["canceled", "scheduled_for_cancellation"].includes(status)) return false;
+  if (status === "canceled") return false;
+  if (status === "scheduled_for_cancellation") {
+    const renewsAt = sub.renewsAt ? new Date(sub.renewsAt) : null;
+    if (renewsAt && renewsAt.getTime() > Date.now()) {
+      return true;
+    }
+    return false;
+  }
   return true;
 }
+
 
 function createLogger(email) {
   const prefix = `[Scheduler][${email}]`;
@@ -180,6 +188,7 @@ module.exports = {
   bootstrap,
   getJob,
 };
+
 
 
 
