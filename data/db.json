@@ -47,6 +47,30 @@
         "maxPdfTextChars": 4000,
         "model": "gpt-5"
       }
+    },
+    {
+      "id": "108769125839692759348",
+      "email": "videokeysbinds8@gmail.com",
+      "name": "Cheese Bond",
+      "picture": "https://lh3.googleusercontent.com/a/ACg8ocJLvGS2wPzA1x6q2x9Y3w1-03RYEDTZgZnNXk7D_jUNp5geyg=s96-c",
+      "role": "user",
+      "plan": "free",
+      "subscription": {
+        "plan": "free",
+        "seats": 1,
+        "status": "active",
+        "renewsAt": null
+      },
+      "settings": {
+        "openaiKey": "",
+        "omittedSenders": "",
+        "importantDesc": "",
+        "allowAttachments": true,
+        "maxAttachmentMB": 5,
+        "maxImages": 3,
+        "maxPdfTextChars": 4000,
+        "model": "gpt-4.1-mini"
+      }
     }
   ],
   "reports": [
@@ -72,6 +96,60 @@
       "id": "demo-videokeysbinds7@gmail.com-3",
       "email": "videokeysbinds7@gmail.com",
       "createdAt": "2025-09-16T14:29:54.001Z",
+      "title": "Security alert from Proton Mail",
+      "description": "New login detected from Frankfurt, Germany.",
+      "status": "urgent",
+      "snippet": "We noticed a new sign-in on your InboxVetter account from a Chrome browser in Frankfurt."
+    },
+    {
+      "id": "demo-naquangaston@gmail.com-1",
+      "email": "naquangaston@gmail.com",
+      "createdAt": "2025-09-17T04:25:28.631Z",
+      "title": "Sponsorship inquiry from Flowgear",
+      "description": "Flowgear wants to collaborate on a sponsored tutorial series.",
+      "status": "needs_review",
+      "snippet": "We're big fans of your channel and would love to work together on a 3-part automation series..."
+    },
+    {
+      "id": "demo-naquangaston@gmail.com-2",
+      "email": "naquangaston@gmail.com",
+      "createdAt": "2025-09-17T01:25:28.631Z",
+      "title": "Payment received from CreatorStack",
+      "description": "Monthly affiliate payout processed successfully.",
+      "status": "completed",
+      "snippet": "Your CreatorStack balance was paid out to your bank ending in 9901."
+    },
+    {
+      "id": "demo-naquangaston@gmail.com-3",
+      "email": "naquangaston@gmail.com",
+      "createdAt": "2025-09-16T22:25:28.631Z",
+      "title": "Security alert from Proton Mail",
+      "description": "New login detected from Frankfurt, Germany.",
+      "status": "urgent",
+      "snippet": "We noticed a new sign-in on your InboxVetter account from a Chrome browser in Frankfurt."
+    },
+    {
+      "id": "demo-videokeysbinds8@gmail.com-1",
+      "email": "videokeysbinds8@gmail.com",
+      "createdAt": "2025-09-17T04:33:42.650Z",
+      "title": "Sponsorship inquiry from Flowgear",
+      "description": "Flowgear wants to collaborate on a sponsored tutorial series.",
+      "status": "needs_review",
+      "snippet": "We're big fans of your channel and would love to work together on a 3-part automation series..."
+    },
+    {
+      "id": "demo-videokeysbinds8@gmail.com-2",
+      "email": "videokeysbinds8@gmail.com",
+      "createdAt": "2025-09-17T01:33:42.650Z",
+      "title": "Payment received from CreatorStack",
+      "description": "Monthly affiliate payout processed successfully.",
+      "status": "completed",
+      "snippet": "Your CreatorStack balance was paid out to your bank ending in 9901."
+    },
+    {
+      "id": "demo-videokeysbinds8@gmail.com-3",
+      "email": "videokeysbinds8@gmail.com",
+      "createdAt": "2025-09-16T22:33:42.650Z",
       "title": "Security alert from Proton Mail",
       "description": "New login detected from Frankfurt, Germany.",
       "status": "urgent",

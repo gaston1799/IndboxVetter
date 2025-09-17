@@ -2,7 +2,7 @@ const {
   getSubscription: getSubscriptionFromStore,
   updateSubscription: updateSubscriptionInStore,
 } = require("../config/db");
-const { stripe, WEBHOOK_SECRET } = require("../config/stripe");
+const { stripe, WEBHOOK_SECRET, PAYMENT_METHOD_CONFIGURATION_ID } = require("../config/stripe");
 const PRICE_BASIC = process.env.STRIPE_PRICE_ID;
 const PRICE_PRO = process.env.STRIPE_PRICE_ID_PREMIUM;
 const DONATION_PRODUCT_NAME = "Support InboxVetter";
@@ -48,18 +48,26 @@ exports.startCheckout = async (req, res) => {
     const price = plan === 'pro' ? PRICE_PRO : PRICE_BASIC;
     if (!price) return res.status(400).json({ ok: false, error: 'Price not configured' });
 
-    const session = await stripe.checkout.sessions.create({
+    const params = {
       mode: 'subscription',
       customer_email: email,
       line_items: [{ price, quantity: 1 }],
       success_url: `${req.protocol}://${req.get('host')}/settings.html?success=1`,
       cancel_url: `${req.protocol}://${req.get('host')}/settings.html?canceled=1`,
-    });
+    };
+    // Prefer explicit Payment Method Configuration if provided; else fall back to 'card'
+    if (PAYMENT_METHOD_CONFIGURATION_ID) {
+      params.payment_method_configuration = PAYMENT_METHOD_CONFIGURATION_ID;
+    } else {
+      params.payment_method_types = ['card'];
+    }
+
+    const session = await stripe.checkout.sessions.create(params);
 
     res.json({ ok: true, url: session.url, id: session.id });
   } catch (err) {
-    console.error('Checkout error:', err);
-    res.status(500).json({ ok: false, error: err.message });
+    console.error('Checkout error:', err.code, err.message);
+    res.status(500).json({ ok: false, error: err.message, code: err.code });
   }
 };
 
