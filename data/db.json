@@ -31,6 +31,12 @@
           "connected": false,
           "updatedAt": null
         }
+      },
+      "vetter": {
+        "active": false,
+        "lastRunAt": null,
+        "lastReportId": null,
+        "logs": []
       }
     },
     {
@@ -64,6 +70,12 @@
           "connected": false,
           "updatedAt": null
         }
+      },
+      "vetter": {
+        "active": false,
+        "lastRunAt": null,
+        "lastReportId": null,
+        "logs": []
       }
     },
     {
@@ -97,6 +109,12 @@
           "connected": false,
           "updatedAt": null
         }
+      },
+      "vetter": {
+        "active": false,
+        "lastRunAt": null,
+        "lastReportId": null,
+        "logs": []
       }
     }
   ],
