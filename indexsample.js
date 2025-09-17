@@ -53,7 +53,7 @@ const log = new CustomLogger("InboxVetter");
 
 /* ===== OpenAI Client ===== */
 const oai = new OpenAI({
-    apiKey: "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"//(process.env.OPENAI_API_KEY || "").trim(),
+    apiKey: process.env.HOUSE_OPENAI_KEY || process.env.OPENAI_API_KEY,
     // If you insist on project keys, you can add:
     // organization: process.env.OPENAI_ORG || undefined,
     // project: process.env.OPENAI_PROJECT || undefined,
