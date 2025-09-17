@@ -59,12 +59,33 @@
         >Donate with Stripe</button>
 
         <div id="message" class="hidden mt-4 text-sm rounded-lg border px-4 py-3"></div>
+        <div
+          id="devMessage"
+          class="hidden mt-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-xs"
+        >
+          <button
+            type="button"
+            id="devToggle"
+            aria-controls="devDetails"
+            aria-expanded="false"
+            class="w-full px-4 py-2 text-left font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+          >
+            Show developer details
+          </button>
+          <pre
+            id="devDetails"
+            class="hidden border-t border-amber-200 bg-amber-100/60 px-4 py-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap overflow-x-auto"
+          ></pre>
+        </div>
       </form>
     </section>
   </main>
 
   <script>
     const messageEl = document.getElementById('message');
+    const devContainer = document.getElementById('devMessage');
+    const devToggleBtn = document.getElementById('devToggle');
+    const devDetailsEl = document.getElementById('devDetails');
     const messageBaseClass = 'mt-4 text-sm rounded-lg border px-4 py-3';
     const messageVariants = {
       success: 'border-green-200 bg-green-50 text-green-700',
@@ -72,15 +93,49 @@
       info: 'border-blue-200 bg-blue-50 text-blue-700'
     };
 
-    function showMessage(type, text) {
+    function setDevDetails(details) {
+      if (!devContainer || !devToggleBtn || !devDetailsEl) return;
+
+      const isVisible = Boolean(details);
+      devToggleBtn.textContent = 'Show developer details';
+      devToggleBtn.setAttribute('aria-expanded', 'false');
+      devDetailsEl.classList.add('hidden');
+      devDetailsEl.textContent = details || '';
+
+      if (isVisible) {
+        devContainer.classList.remove('hidden');
+      } else {
+        devContainer.classList.add('hidden');
+      }
+    }
+
+    if (devToggleBtn) {
+      devToggleBtn.addEventListener('click', () => {
+        if (!devDetailsEl) return;
+        const willShow = devDetailsEl.classList.contains('hidden');
+        if (willShow) {
+          devDetailsEl.classList.remove('hidden');
+          devToggleBtn.textContent = 'Hide developer details';
+          devToggleBtn.setAttribute('aria-expanded', 'true');
+        } else {
+          devDetailsEl.classList.add('hidden');
+          devToggleBtn.textContent = 'Show developer details';
+          devToggleBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+
+    function showMessage(type, text, devDetails = null) {
       const variant = messageVariants[type] || messageVariants.info;
       messageEl.className = `${messageBaseClass} ${variant}`;
       messageEl.textContent = text;
+      setDevDetails(devDetails);
     }
 
     function hideMessage() {
       messageEl.className = `${messageBaseClass} hidden`;
       messageEl.textContent = '';
+      setDevDetails(null);
     }
 
     const params = new URLSearchParams(window.location.search);
@@ -146,13 +201,32 @@
 
         if (!response.ok || !payload?.ok || !payload?.url) {
           const message = payload?.error || 'Unable to start the Stripe checkout session.';
-          throw new Error(message);
+          const payloadText =
+            payload && Object.keys(payload).length
+              ? `Response payload:\n${JSON.stringify(payload, null, 2)}`
+              : null;
+          const devDetails = [
+            `Requested amount: $${amount.toFixed(2)}`,
+            `HTTP status: ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`,
+            payloadText
+          ]
+            .filter(Boolean)
+            .join('\n\n');
+          showMessage('error', message, devDetails);
+          return;
         }
 
         redirecting = true;
         window.location.href = payload.url;
       } catch (err) {
-        showMessage('error', err.message || 'Unexpected error. Please try again.');
+        const errorMessage = err?.message || 'Unexpected error. Please try again.';
+        const devDetails = [
+          err?.message ? `Message: ${err.message}` : null,
+          err?.stack ? `Stack trace:\n${err.stack}` : null
+        ]
+          .filter(Boolean)
+          .join('\n\n');
+        showMessage('error', errorMessage, devDetails || null);
       } finally {
         if (!redirecting) {
           submitBtn.disabled = false;
