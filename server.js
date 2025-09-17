@@ -12,6 +12,10 @@ const { handleStripeWebhook } = require("./controllers/billingController");
 const scheduler = require("./services/inboxScheduler");
 
 const app = express();
+// Render and other hosting providers terminate TLS before forwarding the request
+// to Node. Trust the first proxy hop so `req.secure` is accurate and secure
+// cookies are still sent when the original connection used HTTPS.
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 5173;
 const HOST = process.env.HOST || "0.0.0.0";
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret";
