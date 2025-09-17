@@ -13,6 +13,26 @@ const {
 
 const router = express.Router();
 
+const DEFAULT_GMAIL_REDIRECT = "/settings.html?gmail=connected";
+const REDIRECT_BASE = new URL("https://inboxvetter.local");
+
+function sanitizeRedirect(target) {
+  if (!target) return DEFAULT_GMAIL_REDIRECT;
+  try {
+    const url = new URL(target, REDIRECT_BASE);
+    if (url.origin !== REDIRECT_BASE.origin) {
+      return DEFAULT_GMAIL_REDIRECT;
+    }
+    // Prevent protocol-relative URLs (e.g. //evil.com) and only allow absolute paths.
+    if (!url.pathname.startsWith("/")) {
+      return DEFAULT_GMAIL_REDIRECT;
+    }
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch (err) {
+    return DEFAULT_GMAIL_REDIRECT;
+  }
+}
+
 router.get("/status", requireAuth, (req, res) => {
   const email = req.session?.user?.email;
   if (!email) return res.status(401).json({ ok: false, error: "Not authenticated" });
@@ -84,7 +104,7 @@ router.get("/callback", async (req, res) => {
     delete req.session.gmailOAuthState;
     delete req.session.gmailOAuthStateCreatedAt;
 
-    const target = req.query?.redirect || "/settings.html?gmail=connected";
+    const target = sanitizeRedirect(req.query?.redirect);
     res.redirect(target);
   } catch (err) {
     res.status(500).send(renderer(`Failed to complete Gmail connection: ${err?.message || err}`));
