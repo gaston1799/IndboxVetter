@@ -20,6 +20,9 @@ const DEFAULT_SETTINGS = {
   maxImages: 3,
   maxPdfTextChars: 4000,
   model: "gpt-4.1-mini",
+  safeMode: true,
+  gmailQuery: "label:inbox",
+  gmailMaxResults: 200,
 };
 
 const SAMPLE_REPORTS = [
@@ -142,7 +145,21 @@ function getSubscription(email) {
 function applySettingDefaults(settings = {}) {
   const next = { ...DEFAULT_SETTINGS, ...settings };
   // ensure booleans/numbers are typed correctly
-  next.allowAttachments = settings.allowAttachments ?? DEFAULT_SETTINGS.allowAttachments;
+  const boolFrom = (value, fallback) => {
+    if (value === undefined || value === null || value === "") return fallback;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value !== 0;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (!normalized) return fallback;
+      if (["false", "0", "no", "off"].includes(normalized)) return false;
+      if (["true", "1", "yes", "on"].includes(normalized)) return true;
+      return fallback;
+    }
+    return Boolean(value);
+  };
+  next.allowAttachments = boolFrom(settings.allowAttachments, DEFAULT_SETTINGS.allowAttachments);
+  next.safeMode = boolFrom(settings.safeMode, DEFAULT_SETTINGS.safeMode);
   next.maxAttachmentMB = Number.isFinite(Number(next.maxAttachmentMB))
     ? Number(next.maxAttachmentMB)
     : DEFAULT_SETTINGS.maxAttachmentMB;
@@ -152,6 +169,12 @@ function applySettingDefaults(settings = {}) {
   next.maxPdfTextChars = Number.isFinite(Number(next.maxPdfTextChars))
     ? Number(next.maxPdfTextChars)
     : DEFAULT_SETTINGS.maxPdfTextChars;
+  next.gmailMaxResults = Number.isFinite(Number(next.gmailMaxResults))
+    ? Math.max(1, Math.min(500, Math.round(Number(next.gmailMaxResults))))
+    : DEFAULT_SETTINGS.gmailMaxResults;
+  next.gmailQuery = typeof next.gmailQuery === "string" && next.gmailQuery.trim()
+    ? next.gmailQuery.trim()
+    : DEFAULT_SETTINGS.gmailQuery;
   return next;
 }
 
@@ -306,6 +329,9 @@ function updateSettings(email, updates) {
     openaiKey: "string",
     omittedSenders: "string",
     importantDesc: "string",
+    gmailQuery: "string",
+    gmailMaxResults: "number",
+    safeMode: "boolean",
     allowAttachments: "boolean",
     maxAttachmentMB: "number",
     maxImages: "number",
@@ -321,7 +347,7 @@ function updateSettings(email, updates) {
       const num = Number(value);
       if (!Number.isNaN(num)) ctx.user.settings[key] = num;
     } else if (typeof value === "string") {
-      ctx.user.settings[key] = value;
+      ctx.user.settings[key] = typeof value === "string" ? value.trim() : value;
     }
   }
   ctx.user.settings = applySettingDefaults(ctx.user.settings);

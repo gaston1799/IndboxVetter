@@ -328,7 +328,7 @@ class InboxRunner {
     const listResp = await gmail.users.messages.list({
       userId: "me",
       q: this.config.gmailQuery,
-      maxResults: DEFAULT_MAX_RESULTS,
+      maxResults: this.config.gmailMaxResults || DEFAULT_MAX_RESULTS,
     });
     const ids = (listResp.data.messages || [])
       .map((m) => m.id)
@@ -490,15 +490,14 @@ class InboxRunner {
 }
 
 function buildConfig(settings, overrides) {
-  const safeMode = overrides.safeMode ?? SAFE_MODE_DEFAULT;
+  const safeMode = overrides.safeMode ?? (settings?.safeMode ?? SAFE_MODE_DEFAULT);
   const omittedFromSettings = parseCsv(settings?.omittedSenders || "");
+  const gmailQuery = (overrides.gmailQuery ?? settings?.gmailQuery ?? DEFAULT_GMAIL_QUERY) || DEFAULT_GMAIL_QUERY;
   return {
-    safeMode,
+    safeMode: !!safeMode,
     openaiKey: overrides.openaiKey || settings?.openaiKey || process.env.OPENAI_API_KEY || "",
     openaiModel: overrides.model || settings?.model || process.env.OPENAI_MODEL || "gpt-4.1-mini",
-    allowAttachments:
-      overrides.allowAttachments ??
-      (settings?.allowAttachments !== undefined ? settings.allowAttachments : DEFAULT_ALLOW_ATTACHMENTS),
+    allowAttachments: !!(overrides.allowAttachments ?? (settings?.allowAttachments ?? DEFAULT_ALLOW_ATTACHMENTS)),
     maxAttachmentMB: parseNumber(
       overrides.maxAttachmentMB ?? settings?.maxAttachmentMB,
       DEFAULT_MAX_ATTACHMENT_MB
@@ -508,7 +507,17 @@ function buildConfig(settings, overrides) {
       overrides.maxPdfTextChars ?? settings?.maxPdfTextChars,
       DEFAULT_MAX_PDF_TEXT_CHARS
     ),
-    gmailQuery: overrides.gmailQuery || DEFAULT_GMAIL_QUERY,
+    gmailMaxResults: Math.max(
+      1,
+      Math.min(
+        500,
+        parseNumber(
+          overrides.gmailMaxResults ?? settings?.gmailMaxResults,
+          DEFAULT_MAX_RESULTS
+        )
+      )
+    ),
+    gmailQuery: String(gmailQuery).trim() || DEFAULT_GMAIL_QUERY,
     omittedSenders: omittedFromSettings,
   };
 }
@@ -766,24 +775,24 @@ tbody tr:hover { background: #0c1426; }
 </head>
 <body>
   <h1>InboxVetter - Run Report</h1>
-  <div class="meta">Generated at ${escapeHtml(new Date().toLocaleString())} • ${items.length} item(s)</div>
+  <div class="meta">Generated at ${escapeHtml(new Date().toLocaleString())} ï¿½ ${items.length} item(s)</div>
   <table>
     <thead>
       <tr><th>#</th><th>Date</th><th>From</th><th>Subject</th><th>Action</th><th>SCAM</th><th>Conf</th><th>Labels</th><th>Reason</th><th>Attachments</th></tr>
     </thead>
     <tbody>${rows}</tbody>
   </table>
-  <div class="footer">“Action” = model decision; “SCAM” = explicit scam flag.</div>
+  <div class="footer">ï¿½Actionï¿½ = model decision; ï¿½SCAMï¿½ = explicit scam flag.</div>
 </body>
 </html>`;
 }
 
 function attachmentListHTML(list = []) {
-  if (!list.length) return `<span class="att none">—</span>`;
+  if (!list.length) return `<span class="att none">ï¿½</span>`;
   const items = list
     .map((a) => {
       const label = `${kindEmoji(a.kind)} ${a.filename || "(file)"}`;
-      const hint = `${a.mimeType || ""}${a.sizeMB ? ` • ${humanMB(a.sizeMB)}` : ""}`;
+      const hint = `${a.mimeType || ""}${a.sizeMB ? ` ï¿½ ${humanMB(a.sizeMB)}` : ""}`;
       return `<li class="att" title="${escapeHtml(hint)}">${escapeHtml(label)}</li>`;
     })
     .join("");
@@ -854,6 +863,7 @@ module.exports = {
   summarizeAttachments,
   SCOPES,
 };
+
 
 
 

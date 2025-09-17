@@ -100,6 +100,22 @@
 
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block">
+            <span class="text-sm font-medium text-slate-600">Gmail search query</span>
+            <input type="text" name="gmailQuery" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="label:inbox">
+            <span class="block mt-1 text-xs text-slate-500">Use Gmail search syntax to target messages (e.g., label:inbox newer_than:7d).</span>
+          </label>
+          <label class="block">
+            <span class="text-sm font-medium text-slate-600">Max messages per run</span>
+            <input type="number" name="gmailMaxResults" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2" min="1" max="500" step="1">
+            <span class="block mt-1 text-xs text-slate-500">Caps how many new emails InboxVetter fetches each pass (default 200).</span>
+          </label>
+        </div>
+        <label class="inline-flex items-center gap-2">
+          <input type="checkbox" name="safeMode" class="h-4 w-4 text-indigo-600 border-slate-300">
+          <span class="text-sm font-medium text-slate-600">Safe mode (label and review spam instead of deleting)</span>
+        </label>
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="block">
             <span class="text-sm font-medium text-slate-600">Allow attachments</span>
             <input type="checkbox" name="allowAttachments" class="mt-2 h-4 w-4 text-indigo-600 border-slate-300">
           </label>
@@ -257,6 +273,9 @@
         preferencesForm.openaiKey.value = settings.openaiKey || '';
         preferencesForm.omittedSenders.value = settings.omittedSenders || '';
         preferencesForm.importantDesc.value = settings.importantDesc || '';
+        preferencesForm.gmailQuery.value = settings.gmailQuery || 'label:inbox';
+        preferencesForm.gmailMaxResults.value = settings.gmailMaxResults ?? 200;
+        preferencesForm.safeMode.checked = settings.safeMode ?? true;
         preferencesForm.allowAttachments.checked = settings.allowAttachments ?? true;
         preferencesForm.maxAttachmentMB.value = settings.maxAttachmentMB ?? 5;
         preferencesForm.maxImages.value = settings.maxImages ?? 3;
@@ -339,6 +358,9 @@
         openaiKey: preferencesForm.openaiKey.value.trim(),
         omittedSenders: preferencesForm.omittedSenders.value.trim(),
         importantDesc: preferencesForm.importantDesc.value.trim(),
+        gmailQuery: preferencesForm.gmailQuery.value.trim() || 'label:inbox',
+        gmailMaxResults: Math.max(1, Math.min(500, Number(preferencesForm.gmailMaxResults.value || 200))),
+        safeMode: !!preferencesForm.safeMode.checked,
         allowAttachments: !!preferencesForm.allowAttachments.checked,
         maxAttachmentMB: Number(preferencesForm.maxAttachmentMB.value || 5),
         maxImages: Number(preferencesForm.maxImages.value || 3),
