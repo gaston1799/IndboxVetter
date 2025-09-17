@@ -81,6 +81,9 @@ app.get(["/dashboard", "/dashboard.html"], sessionMiddleware.requireAuth, (_, re
 app.get(["/settings", "/settings.html"], sessionMiddleware.requireAuth, (_, res) =>
   res.sendFile(path.join(PUB, "settings.html"))
 );
+app.get(["/supportme", "/supportme.html"], sessionMiddleware.requireAuth, (_, res) =>
+  res.sendFile(path.join(PUB, "supportme.html"))
+);
 
 // ───────────────────────────────────────────────────────────────────────────────
 // routes
