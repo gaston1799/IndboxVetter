@@ -1,4 +1,5 @@
-@echo offsREM ==============================
+@echo off
+REM ==============================
 REM InboxVetter GitHub Push Script
 REM ==============================
 
