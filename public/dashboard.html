@@ -33,6 +33,7 @@
       </div>
       <div class="flex items-center gap-4">
         <span id="welcome" class="hidden sm:inline text-sm text-slate-600">Welcome, …</span>
+        <button id="unionBtn" class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Union dashboard</button>
         <button id="settingsBtn" class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Settings</button>
         <div class="flex items-center gap-2">
           <img id="avatar" class="h-8 w-8 rounded-full object-cover hidden" alt="avatar" />
@@ -181,6 +182,9 @@
       });
       document.getElementById('settingsBtn').addEventListener('click', () => {
         location.href = '/settings.html';
+      });
+      document.getElementById('unionBtn').addEventListener('click', () => {
+        location.href = '/union-dashboard.html';
       });
       document.getElementById('managePlanBtn').addEventListener('click', () => {
         location.href = '/settings.html#subscription';
