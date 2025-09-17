@@ -3,6 +3,7 @@ const {
   updateSubscription: updateSubscriptionInStore,
 } = require("../config/db");
 const { stripe, WEBHOOK_SECRET, PAYMENT_METHOD_CONFIGURATION_ID } = require("../config/stripe");
+const scheduler = require("../services/inboxScheduler");
 const PRICE_BASIC = process.env.STRIPE_PRICE_ID;
 const PRICE_PRO = process.env.STRIPE_PRICE_ID_PREMIUM;
 const DONATION_PRODUCT_NAME = "Support InboxVetter";
@@ -15,6 +16,34 @@ function ensureEmail(req, res) {
   }
   return email;
 }
+function subscriptionNeedsAutomation(sub) {
+  if (!sub) return false;
+  const plan = (sub.plan || "").toLowerCase();
+  if (!plan || plan === "free") return false;
+  const status = (sub.status || "").toLowerCase();
+  if (status === "canceled" || status === "scheduled_for_cancellation") return false;
+  return true;
+}
+
+function syncScheduler(email, subscription) {
+  if (!email) return;
+  if (subscriptionNeedsAutomation(subscription)) {
+    scheduler.startForUser(email);
+  } else {
+    scheduler.stopForUser(email);
+  }
+}
+
+function normalizePlanSlug(plan) {
+  const raw = (plan || "").toLowerCase();
+  if (!raw) return "basic";
+  if (raw === "creator" || raw === "basic_tier" || raw === "base") return "basic";
+  if (raw === "team" || raw === "premium" || raw === "pro_tier") return "pro";
+  if (raw === "free" || raw === "basic" || raw === "pro") return raw;
+  return raw;
+}
+
+
 
 exports.getSubscription = (req, res) => {
   const email = ensureEmail(req, res);
@@ -35,6 +64,7 @@ exports.updateSubscription = (req, res) => {
     res.status(404).json({ ok: false, error: "User not found" });
     return;
   }
+  syncScheduler(email, subscription);
 
   res.json({ ok: true, subscription });
 };
@@ -44,7 +74,7 @@ exports.startCheckout = async (req, res) => {
   if (!email) return;
 
   try {
-    const plan = (req.body?.plan || '').toLowerCase();
+    const plan = normalizePlanSlug(req.body?.plan || 'basic');
     const price = plan === 'pro' ? PRICE_PRO : PRICE_BASIC;
     if (!price) return res.status(400).json({ ok: false, error: 'Price not configured' });
 
@@ -54,6 +84,8 @@ exports.startCheckout = async (req, res) => {
       line_items: [{ price, quantity: 1 }],
       success_url: `${req.protocol}://${req.get('host')}/settings.html?success=1`,
       cancel_url: `${req.protocol}://${req.get('host')}/settings.html?canceled=1`,
+      metadata: { plan },
+      subscription_data: { metadata: { plan } },
     };
     // Prefer explicit Payment Method Configuration if provided; else fall back to 'card'
     if (PAYMENT_METHOD_CONFIGURATION_ID) {
@@ -143,13 +175,15 @@ exports.handleStripeWebhook = (req, res) => {
       const email = session.customer_email;
 
       if (email) {
+        const plan = normalizePlanSlug(session.metadata?.plan || 'pro');
         const subscription = updateSubscriptionInStore(email, {
-          plan: "pro",
+          plan,
           status: "active",
           stripeSubscriptionId: session.subscription,
           stripeCustomerId: session.customer || null,
         });
-        console.log("✅ Subscription started for:", email, subscription);
+        syncScheduler(email, subscription);
+        console.log("?o. Subscription started for:", email, subscription);
       }
       break;
     }
@@ -159,11 +193,12 @@ exports.handleStripeWebhook = (req, res) => {
       const email = subscription.customer_email;
 
       if (email) {
-        updateSubscriptionInStore(email, {
+        const updated = updateSubscriptionInStore(email, {
           plan: "free",
           status: "canceled",
         });
-        console.log("❌ Subscription canceled for:", email);
+        syncScheduler(email, updated);
+        console.log("??O Subscription canceled for:", email);
       }
       break;
     }
@@ -247,9 +282,14 @@ exports.cancelAtPeriodEnd = async (req, res) => {
       stripeSubscriptionId: subId,
       stripeCustomerId: customerId || sub.stripeCustomerId || null,
     });
+    syncScheduler(email, next);
+
     res.json({ ok: true, subscription: next });
   } catch (err) {
     console.error('Cancel error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 };
+
+
+

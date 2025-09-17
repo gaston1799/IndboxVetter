@@ -13,14 +13,12 @@ router.post("/google", async (req, res) => {
     const p = await verifyIdToken(idToken); // { sub, email, name, picture, exp }
     const user = await User.findOrCreate({ id: p.sub, email: p.email, name: p.name, picture: p.picture });
 
-    // Persist session until the Google token expires
-    if (p.exp) {
-      const ttlMs = Math.max(0, (p.exp * 1000) - Date.now());
-      // If exp is very short (e.g., < 5 minutes), give a small grace window
-      const minTtl = 5 * 60 * 1000;
-      req.sessionOptions.maxAge = Math.max(ttlMs, minTtl);
-    }
-    req.session.user = user;
+    req.session.user = {
+      email: user.email,
+      name: user.name,
+      picture: user.picture,
+      role: user.role,
+    };
     res.json({ ok: true, user });
   } catch (e) {
     res.status(401).json({ ok: false, error: e.message });
@@ -40,3 +38,4 @@ router.post("/logout", (req, res) => {
 });
 
 module.exports = router;
+

@@ -3,16 +3,31 @@ require("dotenv").config();
 
 const os = require("os");
 const path = require("path");
+const crypto = require("crypto");
 const express = require("express");
 const cookieSession = require("cookie-session");
 const sessionMiddleware = require("./middleware/authMiddleware");
 const errorHandler = require("./middleware/errorHandler");
 const { handleStripeWebhook } = require("./controllers/billingController");
+const scheduler = require("./services/inboxScheduler");
 
 const app = express();
 const PORT = process.env.PORT || 5173;
 const HOST = process.env.HOST || "0.0.0.0";
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret";
+const SESSION_MAX_AGE_DAYS = Number(process.env.SESSION_MAX_AGE_DAYS || 30);
+const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || "iv.session";
+const SESSION_SECURE = process.env.SESSION_SECURE_COOKIES
+  ? /^true$/i.test(process.env.SESSION_SECURE_COOKIES)
+  : process.env.NODE_ENV === "production";
+const SESSION_KEYS = SESSION_SECRET.split(",")
+  .map((s) => s.trim())
+  .filter(Boolean)
+  .map((secret) => crypto.createHash("sha256").update(secret).digest("hex"));
+if (!SESSION_KEYS.length) {
+  SESSION_KEYS.push(crypto.createHash("sha256").update("dev-secret").digest("hex"));
+}
+const SESSION_MAX_AGE_MS = Math.max(1, SESSION_MAX_AGE_DAYS) * 24 * 60 * 60 * 1000;
 
 // ───────────────────────────────────────────────────────────────────────────────
 // core middleware
@@ -26,13 +41,20 @@ app.post(
 app.use(express.json({ limit: "1mb" }));
 app.use(
   cookieSession({
-    name: "iv.session",
-    keys: [SESSION_SECRET],
-    maxAge: 24 * 60 * 60 * 1000, // 1 day
+    name: SESSION_COOKIE_NAME,
+    keys: SESSION_KEYS,
+    maxAge: SESSION_MAX_AGE_MS,
     sameSite: "lax",
-    // secure: process.env.NODE_ENV === "production", // uncomment for HTTPS-only cookies in prod
+    httpOnly: true,
+    secure: SESSION_SECURE,
   })
 );
+app.use((req, res, next) => {
+  if (req.sessionOptions) {
+    req.sessionOptions.maxAge = SESSION_MAX_AGE_MS;
+  }
+  next();
+});
 
 // NOTE: DO NOT gate everything globally. We will attach requireAuth per-route.
 // app.use(sessionMiddleware.requireAuth);
@@ -89,6 +111,7 @@ app.get(["/supportme", "/supportme.html"], sessionMiddleware.requireAuth, (_, re
 // routes
 // ───────────────────────────────────────────────────────────────────────────────
 app.use("/auth", require("./routes/auth")); // login/logout/google callbacks should be public
+app.use("/gmail", require("./routes/gmail"));
 
 // Protect these route trees
 app.use("/api", sessionMiddleware.requireAuth, require("./routes/api"));
@@ -117,8 +140,21 @@ app.listen(PORT, HOST, () => {
     }
   }
   console.log("InboxVetter server up:");
-  console.log(`  Local → http://localhost:${PORT}`);
-  addrs.forEach((ip) => console.log(`  LAN   → http://${ip}:${PORT}`));
+  console.log(`  Local - http://localhost:${PORT}`);
+  addrs.forEach((ip) => console.log(`  LAN   - http://${ip}:${PORT}`));
+
+  scheduler.bootstrap().catch((err) => {
+    console.error("Scheduler bootstrap failed:", err);
+  });
 });
 
 module.exports = app;
+
+
+
+
+
+
+
+
+

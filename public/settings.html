@@ -163,15 +163,30 @@
 
     const titleCase = (s) => s.replace(/\b([a-z])/g, m => m.toUpperCase());
     const planName = (slug) => slug ? titleCase(slug.replace(/[._-]+/g, ' ')) : 'Free';
+    const normalizePlan = (slug) => {
+      const raw = (slug || '').toLowerCase();
+      if (!raw) return 'free';
+      if (raw === 'creator' || raw === 'base' || raw === 'basic_tier') return 'basic';
+      if (raw === 'team' || raw === 'premium' || raw === 'pro_tier') return 'pro';
+      return raw;
+    };
+    const displayPlan = (slug) => {
+      const normalized = normalizePlan(slug);
+      if (normalized === 'basic') return 'Basic';
+      if (normalized === 'pro') return 'Pro';
+      if (normalized === 'free') return 'Free';
+      return planName(slug || normalized);
+    };
     const fmtDate = (iso) => {
       if (!iso) return '—';
       try { return new Date(iso).toLocaleString(); } catch { return iso; }
     };
 
     function selectPlan(plan) {
+      const normalized = normalizePlan(plan);
       planCards.forEach((card) => {
         const input = card.querySelector('input[type="radio"]');
-        const active = input.value === plan;
+        const active = input.value === normalized;
         input.checked = active;
         card.classList.toggle('border-indigo-500', active);
         card.classList.toggle('shadow-sm', active);
@@ -210,16 +225,17 @@
     function updateSubscriptionUI(subscription) {
       if (!subscription) return;
       currentSub = subscription;
-      const summary = `${planName(subscription.plan)} • ${titleCase((subscription.status || 'inactive').replace(/[._-]+/g, ' '))}`;
+      const normalizedPlan = normalizePlan(subscription.plan);
+      const summary = `${displayPlan(normalizedPlan)} • ${titleCase((subscription.status || 'inactive').replace(/[._-]+/g, ' '))}`;
       subscriptionSummary.textContent = subscription.renewsAt
         ? `${summary} • Renews ${fmtDate(subscription.renewsAt)}`
         : summary;
-      selectPlan(subscription.plan || 'basic');
+      selectPlan(normalizedPlan || 'basic');
       planStatusMessage.textContent = '';
 
       const activeStatuses = new Set(['active','trialing','scheduled_for_cancellation']);
       const paidPlans = new Set(['basic','pro']);
-      const showPrefs = paidPlans.has((subscription.plan || '').toLowerCase()) && activeStatuses.has((subscription.status || '').toLowerCase());
+      const showPrefs = paidPlans.has(normalizePlan(subscription.plan)) && activeStatuses.has((subscription.status || '').toLowerCase());
       prefsSection.style.display = showPrefs ? '' : 'none';
     }
 
@@ -234,7 +250,7 @@
 
       const activeStatuses = new Set(['active','trialing','scheduled_for_cancellation']);
       const paidPlans = new Set(['basic','pro']);
-      const showPrefs = paidPlans.has((sub.plan || '').toLowerCase()) && activeStatuses.has((sub.status || '').toLowerCase());
+      const showPrefs = paidPlans.has(normalizePlan(sub.plan)) && activeStatuses.has((sub.status || '').toLowerCase());
       if (showPrefs) {
         const settingsResp = await api('/api/settings');
         const settings = settingsResp.settings || {};
@@ -277,7 +293,7 @@
       try {
         const activeStatuses = new Set(['active','trialing','scheduled_for_cancellation']);
         const paidPlans = new Set(['basic','pro']);
-        const curPlan = (currentSub?.plan || '').toLowerCase();
+        const curPlan = normalizePlan(currentSub?.plan);
         const curActive = activeStatuses.has((currentSub?.status || '').toLowerCase());
         const wantsPaid = paidPlans.has(plan.toLowerCase());
         if (wantsPaid) {

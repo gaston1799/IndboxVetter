@@ -108,6 +108,33 @@ function updateSubscription(email, data) {
   return user.subscription;
 }
 
+function getGmailIntegration(email) {
+  const ctx = getUserInternal(email);
+  if (!ctx) return { connected: false, updatedAt: null };
+  let dirty = false;
+  if (!ctx.user.integrations) {
+    ctx.user.integrations = {};
+    dirty = true;
+  }
+  if (!ctx.user.integrations.gmail) {
+    ctx.user.integrations.gmail = { connected: false, updatedAt: null };
+    dirty = true;
+  }
+  if (dirty) writeDB(ctx.db);
+  return ctx.user.integrations.gmail;
+}
+
+function updateGmailIntegration(email, updates) {
+  const ctx = getUserInternal(email);
+  if (!ctx) return null;
+  ctx.user.integrations = ctx.user.integrations || {};
+  const current = ctx.user.integrations.gmail || { connected: false, updatedAt: null };
+  const next = { ...current, ...updates };
+  ctx.user.integrations.gmail = next;
+  writeDB(ctx.db);
+  return next;
+}
+
 function getSubscription(email) {
   const db = readDB();
   return db.users.find(u => u.email === email)?.subscription || null;
@@ -172,6 +199,14 @@ function ensureUserDefaults(user) {
       changed = true;
     }
   }
+  if (!user.integrations) {
+    user.integrations = {};
+    changed = true;
+  }
+  if (!user.integrations.gmail) {
+    user.integrations.gmail = { connected: false, updatedAt: null };
+    changed = true;
+  }
   user.plan = user.subscription.plan;
   if (!user.role) {
     user.role = ADMIN_SET.has((user.email || "").toLowerCase())
@@ -192,6 +227,7 @@ function sanitizeUser(user) {
     role: user.role,
     plan: user.plan,
     subscription: user.subscription,
+    integrations: user.integrations || {},
   };
 }
 
@@ -293,6 +329,33 @@ function updateSettings(email, updates) {
   return ctx.user.settings;
 }
 
+function getGmailIntegration(email) {
+  const ctx = getUserInternal(email);
+  if (!ctx) return { connected: false, updatedAt: null };
+  let dirty = false;
+  if (!ctx.user.integrations) {
+    ctx.user.integrations = {};
+    dirty = true;
+  }
+  if (!ctx.user.integrations.gmail) {
+    ctx.user.integrations.gmail = { connected: false, updatedAt: null };
+    dirty = true;
+  }
+  if (dirty) writeDB(ctx.db);
+  return ctx.user.integrations.gmail;
+}
+
+function updateGmailIntegration(email, updates) {
+  const ctx = getUserInternal(email);
+  if (!ctx) return null;
+  ctx.user.integrations = ctx.user.integrations || {};
+  const current = ctx.user.integrations.gmail || { connected: false, updatedAt: null };
+  const next = { ...current, ...updates };
+  ctx.user.integrations.gmail = next;
+  writeDB(ctx.db);
+  return next;
+}
+
 function getSubscription(email) {
   const ctx = getUserInternal(email);
   if (!ctx) return defaultSubscription("free");
@@ -371,7 +434,54 @@ function listReports(email) {
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
-function getReport(email, id) {
+function saveReports(email, records = []) {
+  if (!records.length) return [];
+  const db = readDB();
+  if (!Array.isArray(db.reports)) db.reports = [];
+  let dirty = false;
+  const out = [];
+
+  for (const record of records) {
+    const id =
+      record.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const existing = db.reports.find((r) => r.email === email && r.id === id);
+    const base =
+      existing || {
+        id,
+        email,
+        createdAt: new Date().toISOString(),
+        title: "",
+        description: "",
+        status: "needs_review",
+        snippet: "",
+        meta: null,
+      };
+    const next = {
+      ...base,
+      ...record,
+      id,
+      email,
+      createdAt: record.createdAt || base.createdAt || new Date().toISOString(),
+      status: record.status || base.status || "needs_review",
+      description: record.description ?? base.description ?? "",
+      snippet: record.snippet ?? record.description ?? base.snippet ?? "",
+      meta: record.meta ?? base.meta ?? null,
+    };
+
+    if (existing) {
+      Object.assign(existing, next);
+    } else {
+      db.reports.push(next);
+    }
+
+    out.push(next);
+    dirty = true;
+  }
+
+  if (dirty) writeDB(db);
+  return out;
+}
+ function getReport(email, id) {
   const db = readDB();
   const report = db.reports.find((r) => r.email === email && r.id === id);
   if (!report) return null;
@@ -409,12 +519,29 @@ module.exports = {
   listUsers,
   getSettings,
   updateSettings,
+  getGmailIntegration,
+  updateGmailIntegration,
   getSubscription,
   updateSubscription,
   listReports,
+  saveReports,
   getReport,
   addTransaction,
   getTransactions,
-  updateSubscription,
-  getSubscription
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

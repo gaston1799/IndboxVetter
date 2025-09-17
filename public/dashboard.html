@@ -107,6 +107,20 @@
     };
     const titleCase = s => s.replace(/\b([a-z])/g, m => m.toUpperCase());
     const planName = slug => slug ? titleCase(slug.replace(/[._-]+/g, ' ')) : 'Free';
+    const normalizePlan = slug => {
+      const raw = (slug || '').toLowerCase();
+      if (!raw) return 'free';
+      if (raw === 'creator' || raw === 'base' || raw === 'basic_tier') return 'basic';
+      if (raw === 'team' || raw === 'premium' || raw === 'pro_tier') return 'pro';
+      return raw;
+    };
+    const displayPlan = slug => {
+      const normalized = normalizePlan(slug);
+      if (normalized === 'basic') return 'Basic';
+      if (normalized === 'pro') return 'Pro';
+      if (normalized === 'free') return 'Free';
+      return planName(slug || normalized);
+    };
 
     function firstNameFromProfile(profile) {
       if (profile?.firstName) return profile.firstName;
@@ -138,7 +152,8 @@
     function describeSubscription(sub) {
       if (!sub) return 'Subscription inactive';
       const status = titleCase((sub.status || 'inactive').replace(/[._-]+/g, ' '));
-      if (!sub.renewsAt) return `${status} • ${planName(sub.plan)} plan`;
+      const planLabel = displayPlan(sub.plan);
+      if (!sub.renewsAt) return `${status} • ${planLabel} plan`;
       return `${status} • Renews ${fmtDate(sub.renewsAt)}`;
     }
 
@@ -148,8 +163,9 @@
       const me = meResp.user || {};
       document.getElementById('welcome').textContent = `Welcome, ${firstNameFromProfile(me)}!`;
       document.getElementById('welcome').classList.remove('hidden');
-      document.getElementById('planBadge').textContent = `${planName(me.subscription?.plan || me.plan)} plan`;
-      document.getElementById('planLabel').textContent = planName(me.subscription?.plan || me.plan);
+      const planSlug = me.subscription?.plan || me.plan;
+      document.getElementById('planBadge').textContent = `${displayPlan(planSlug)} plan`;
+      document.getElementById('planLabel').textContent = displayPlan(planSlug);
       document.getElementById('planStatus').textContent = describeSubscription(me.subscription);
       if (me.picture) {
         const img = document.getElementById('avatar');
