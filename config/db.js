@@ -25,6 +25,13 @@ const DEFAULT_SETTINGS = {
   gmailMaxResults: 200,
 };
 
+const DEFAULT_VETTER_STATE = {
+  active: false,
+  lastRunAt: null,
+  lastReportId: null,
+  logs: [],
+};
+
 const SAMPLE_REPORTS = [
   {
     title: "Sponsorship inquiry from Flowgear",
@@ -228,6 +235,31 @@ function ensureUserDefaults(user) {
   }
   if (!user.integrations.gmail) {
     user.integrations.gmail = { connected: false, updatedAt: null };
+    changed = true;
+  }
+  if (!user.vetter || typeof user.vetter !== "object") {
+    user.vetter = { ...DEFAULT_VETTER_STATE };
+    changed = true;
+  } else {
+    if (typeof user.vetter.active !== "boolean") {
+      user.vetter.active = Boolean(user.vetter.active);
+      changed = true;
+    }
+    if (!("lastRunAt" in user.vetter)) {
+      user.vetter.lastRunAt = null;
+      changed = true;
+    }
+    if (!("lastReportId" in user.vetter)) {
+      user.vetter.lastReportId = null;
+      changed = true;
+    }
+    if (!Array.isArray(user.vetter.logs)) {
+      user.vetter.logs = [];
+      changed = true;
+    }
+  }
+  if (Array.isArray(user.vetter?.logs) && user.vetter.logs.length > 100) {
+    user.vetter.logs = user.vetter.logs.slice(-100);
     changed = true;
   }
   user.plan = user.subscription.plan;
@@ -507,11 +539,154 @@ function saveReports(email, records = []) {
   if (dirty) writeDB(db);
   return out;
 }
- function getReport(email, id) {
+function getReport(email, id) {
   const db = readDB();
   const report = db.reports.find((r) => r.email === email && r.id === id);
   if (!report) return null;
   return report;
+}
+
+function sanitizeVetterState(state = {}) {
+  return {
+    active: Boolean(state.active),
+    lastRunAt: state.lastRunAt || null,
+    lastReportId: state.lastReportId || null,
+    logs: Array.isArray(state.logs) ? state.logs.slice(-100) : [],
+  };
+}
+
+function getVetterState(email) {
+  const ctx = getUserInternal(email);
+  if (!ctx) return sanitizeVetterState(DEFAULT_VETTER_STATE);
+  if (ensureUserDefaults(ctx.user)) {
+    writeDB(ctx.db);
+  }
+  return sanitizeVetterState(ctx.user.vetter);
+}
+
+function appendVetterLog(user, message, level = "info") {
+  const entry = {
+    id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    level,
+    message,
+    timestamp: new Date().toISOString(),
+  };
+  if (!Array.isArray(user.vetter.logs)) user.vetter.logs = [];
+  user.vetter.logs.push(entry);
+  if (user.vetter.logs.length > 100) {
+    user.vetter.logs = user.vetter.logs.slice(-100);
+  }
+  return entry;
+}
+
+const SAMPLE_VETTER_THEMES = [
+  {
+    topic: "Sponsorship opportunities",
+    highlight: "Brand partnerships are lining up for next quarter.",
+    actions: [
+      "Review the Flowgear proposal and respond by Friday.",
+      "Prepare rate card update for premium sponsors.",
+    ],
+  },
+  {
+    topic: "Community engagement",
+    highlight: "Audience replies are trending 22% higher this week.",
+    actions: [
+      "Schedule a Q&A livestream to capitalize on momentum.",
+      "Tag top fans for early access to the new course drop.",
+    ],
+  },
+  {
+    topic: "Security & compliance",
+    highlight: "Security alerts need acknowledgement in the next 24 hours.",
+    actions: [
+      "Confirm the Frankfurt login attempt was legitimate.",
+      "Rotate backup codes and archive the incident summary.",
+    ],
+  },
+  {
+    topic: "Revenue tracking",
+    highlight: "Payouts from affiliate partners cleared overnight.",
+    actions: [
+      "Log the CreatorStack payment in the ledger.",
+      "Send thank-you notes to top referrers.",
+    ],
+  },
+];
+
+function pickSampleTheme() {
+  const idx = Math.floor(Math.random() * SAMPLE_VETTER_THEMES.length);
+  return SAMPLE_VETTER_THEMES[idx];
+}
+
+function startVetterRun(email) {
+  const ctx = getUserInternal(email);
+  if (!ctx) return null;
+
+  if (ensureUserDefaults(ctx.user)) {
+    writeDB(ctx.db);
+  }
+
+  if (ctx.user.vetter.active) {
+    return { alreadyActive: true, vetter: sanitizeVetterState(ctx.user.vetter) };
+  }
+
+  ctx.user.vetter.active = true;
+  ctx.user.vetter.lastRunAt = new Date().toISOString();
+  const newLogs = [];
+
+  const push = (message, level = "info") => {
+    const entry = appendVetterLog(ctx.user, message, level);
+    newLogs.push(entry);
+    return entry;
+  };
+
+  push("Starting InboxVetter union run…");
+  push("Gathering recent inbox activity.");
+  push("Prioritizing opportunities and alerts.");
+
+  const theme = pickSampleTheme();
+  const createdAt = new Date().toISOString();
+  const report = {
+    id: `union-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    email,
+    title: `${theme.topic} update`,
+    description: theme.highlight,
+    snippet: `${theme.highlight} ${theme.actions[0]}`,
+    status: "completed",
+    createdAt,
+    meta: {
+      highlights: [theme.highlight],
+      actions: theme.actions,
+      generatedAt: createdAt,
+    },
+  };
+
+  if (!Array.isArray(ctx.db.reports)) ctx.db.reports = [];
+  ctx.db.reports.push(report);
+
+  push(`Report ready: ${report.title}.`);
+
+  ctx.user.vetter.active = false;
+  ctx.user.vetter.lastReportId = report.id;
+  ctx.user.vetter.lastRunAt = createdAt;
+  if (!Array.isArray(ctx.user.vetter.logs)) {
+    ctx.user.vetter.logs = [];
+  }
+  if (ctx.user.vetter.logs.length > 100) {
+    ctx.user.vetter.logs = ctx.user.vetter.logs.slice(-100);
+  }
+
+  push("InboxVetter run completed.", "success");
+
+  writeDB(ctx.db);
+
+  return {
+    alreadyActive: false,
+    vetter: sanitizeVetterState(ctx.user.vetter),
+    events: newLogs,
+    report,
+  };
 }
 
 /* TRANSACTIONS (retained for potential auditing) */
@@ -552,6 +727,8 @@ module.exports = {
   listReports,
   saveReports,
   getReport,
+  getVetterState,
+  startVetterRun,
   addTransaction,
   getTransactions,
 };

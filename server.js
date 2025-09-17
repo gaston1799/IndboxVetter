@@ -125,6 +125,14 @@ app.get(["/settings", "/settings.html"], sessionMiddleware.requireAuth, (_, res)
 app.get(["/supportme", "/supportme.html"], sessionMiddleware.requireAuth, (_, res) =>
   res.sendFile(path.join(PUB, "supportme.html"))
 );
+app.get(
+  ["/union", "/union.html", "/union-dashboard", "/union-dashboard.html"],
+  sessionMiddleware.requireAuth,
+  (_, res) => res.sendFile(path.join(PUB, "union-dashboard.html"))
+);
+app.get(["/report", "/report.html"], sessionMiddleware.requireAuth, (_, res) =>
+  res.sendFile(path.join(PUB, "report.html"))
+);
 
 // ───────────────────────────────────────────────────────────────────────────────
 // routes
