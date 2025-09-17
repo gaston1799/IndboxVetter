@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Union Dashboard</title>
+  <script src="/theme.js"></script>
+  <script src="/config.js"></script>
+  <script src="/version.js" defer></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html[data-theme="dark"] body { background-color: #0f172a; color: #e2e8f0; }
+    html[data-theme="dark"] header { background-color: #0b1220; border-color: #1f2937; }
+    html[data-theme="dark"] .bg-slate-50 { background-color: #0f172a !important; }
+    html[data-theme="dark"] .bg-white { background-color: #0b1220 !important; }
+    html[data-theme="dark"] .text-slate-900 { color: #e2e8f0 !important; }
+    html[data-theme="dark"] .text-slate-600, html[data-theme="dark"] .text-slate-500 { color: #94a3b8 !important; }
+    html[data-theme="dark"] .border-slate-200, html[data-theme="dark"] .border-slate-300 { border-color: #1f2937 !important; }
+    html[data-theme="dark"] select, html[data-theme="dark"] input, html[data-theme="dark"] button { background-color: #0b1220; color: #e2e8f0; border-color: #334155; }
+    html[data-theme="dark"] .hover\:bg-slate-100:hover { background-color: #111827 !important; }
+    html[data-theme="dark"] .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.15) !important; }
+    html[data-theme="dark"] .bg-red-50 { background-color: rgba(248, 113, 113, 0.12) !important; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <header class="w-full bg-white border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-8 w-8 rounded-xl bg-indigo-600"></div>
+        <div>
+          <h1 class="text-xl font-semibold">InboxVetter</h1>
+          <p class="text-xs text-slate-500" id="planBadge">Loading plan…</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <span id="welcome" class="hidden sm:inline text-sm text-slate-600">Welcome, …</span>
+        <button id="dashboardBtn" class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Main dashboard</button>
+        <button id="settingsBtn" class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Settings</button>
+        <div class="flex items-center gap-2">
+          <img id="avatar" class="h-8 w-8 rounded-full object-cover hidden" alt="avatar" />
+          <button id="logoutBtn" class="text-sm px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800">Log out</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <section class="bg-white border border-slate-200 rounded-xl p-5">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <p class="text-sm text-slate-500">InboxVetter status</p>
+          <div class="mt-2 flex items-center gap-2">
+            <span id="statusDot" class="h-2.5 w-2.5 rounded-full bg-slate-300"></span>
+            <span id="statusLabel" class="text-lg font-semibold">Checking…</span>
+          </div>
+          <p id="lastRun" class="mt-1 text-sm text-slate-600">Last run: —</p>
+          <button id="lastReport" class="mt-2 hidden text-sm text-indigo-600 hover:underline" type="button"></button>
+        </div>
+        <div class="flex flex-col items-stretch sm:flex-row sm:items-center gap-3">
+          <button id="startBtn" class="text-sm px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed">Start</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white border border-slate-200 rounded-xl p-5">
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="text-lg font-semibold">Activity log</h2>
+        <span id="logCount" class="text-xs text-slate-500">0 entries</span>
+      </div>
+      <div class="mt-4 max-h-72 overflow-y-auto border border-slate-200 rounded-lg bg-slate-50 p-4">
+        <div id="logEmpty" class="text-sm text-slate-500">No activity yet. Start a run to see real-time progress.</div>
+        <ul id="logList" class="space-y-3"></ul>
+      </div>
+    </section>
+
+    <section class="bg-white border border-slate-200 rounded-xl p-5">
+      <div class="mb-4 flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Generated reports</h2>
+        <p id="reportCount" class="text-xs text-slate-500">0 reports</p>
+      </div>
+      <div id="reportsEmpty" class="bg-white border border-dashed border-slate-300 rounded-xl p-6 text-center text-slate-500">
+        No reports yet. Start a vetter run to generate your first summary.
+      </div>
+      <ul id="reportsList" class="grid md:grid-cols-2 gap-4"></ul>
+    </section>
+  </main>
+
+  <template id="logRow">
+    <li class="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+      <div class="flex items-start justify-between gap-3">
+        <p class="text-sm text-slate-600"></p>
+        <span class="text-xs text-slate-400 whitespace-nowrap"></span>
+      </div>
+    </li>
+  </template>
+
+  <template id="reportRow">
+    <li>
+      <button type="button" class="w-full text-left bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h3 class="font-medium text-slate-900 line-clamp-1"></h3>
+            <p class="mt-1 text-sm text-slate-600"></p>
+            <p class="mt-1 text-xs text-slate-500"></p>
+          </div>
+          <span class="inline-flex items-center text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">View</span>
+        </div>
+      </button>
+    </li>
+  </template>
+
+  <script>
+    const fmtDate = (iso) => {
+      if (!iso) return '—';
+      try {
+        return new Date(iso).toLocaleString();
+      } catch {
+        return iso;
+      }
+    };
+    const titleCase = (s = '') => s.replace(/\b([a-z])/g, (m) => m.toUpperCase());
+    const planName = (slug) => {
+      const raw = (slug || '').toLowerCase();
+      if (!raw) return 'Free';
+      if (['creator', 'base', 'basic_tier'].includes(raw)) return 'Basic';
+      if (['team', 'premium', 'pro_tier'].includes(raw)) return 'Pro';
+      if (raw === 'free') return 'Free';
+      return titleCase(raw.replace(/[._-]+/g, ' '));
+    };
+
+    async function api(path, opts) {
+      const res = await fetch(path, { credentials: 'include', ...opts });
+      if (res.status === 401) {
+        location.href = '/login.html';
+        return Promise.reject(new Error('Not authenticated'));
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const message = data?.error || data?.message || 'Request failed';
+        const err = new Error(message);
+        err.status = res.status;
+        err.payload = data;
+        throw err;
+      }
+      return data;
+    }
+
+    const statusDot = document.getElementById('statusDot');
+    const statusLabel = document.getElementById('statusLabel');
+    const lastRunEl = document.getElementById('lastRun');
+    const lastReportBtn = document.getElementById('lastReport');
+    const startBtn = document.getElementById('startBtn');
+    const logList = document.getElementById('logList');
+    const logEmpty = document.getElementById('logEmpty');
+    const logCount = document.getElementById('logCount');
+    const logTpl = document.getElementById('logRow');
+    const reportsList = document.getElementById('reportsList');
+    const reportsEmpty = document.getElementById('reportsEmpty');
+    const reportCount = document.getElementById('reportCount');
+    const reportTpl = document.getElementById('reportRow');
+
+    let vetterState = { active: false, lastRunAt: null, lastReportId: null, logs: [] };
+    let logs = [];
+    let reports = [];
+
+    function renderStatus(state) {
+      const active = Boolean(state?.active);
+      statusDot.className = 'h-2.5 w-2.5 rounded-full ' + (active ? 'bg-emerald-500' : 'bg-slate-300');
+      statusLabel.textContent = active ? 'Active' : 'Idle';
+      lastRunEl.textContent = `Last run: ${fmtDate(state?.lastRunAt)}`;
+      if (state?.lastReportId) {
+        lastReportBtn.classList.remove('hidden');
+        lastReportBtn.textContent = 'Open last report';
+        lastReportBtn.dataset.reportId = state.lastReportId;
+      } else {
+        lastReportBtn.classList.add('hidden');
+        delete lastReportBtn.dataset.reportId;
+      }
+    }
+
+    function renderLogs() {
+      const entries = logs.slice().sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      logList.innerHTML = '';
+      if (!entries.length) {
+        logEmpty.classList.remove('hidden');
+      } else {
+        logEmpty.classList.add('hidden');
+      }
+      logCount.textContent = `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`;
+      for (const entry of entries) {
+        const node = logTpl.content.cloneNode(true);
+        const container = node.querySelector('li');
+        const level = (entry.level || 'info').toLowerCase();
+        if (level === 'error') {
+          container.classList.add('border-red-200', 'bg-red-50');
+        } else if (level === 'success') {
+          container.classList.add('border-emerald-200', 'bg-emerald-50');
+        }
+        node.querySelector('p').textContent = entry.message || '';
+        node.querySelector('span').textContent = fmtDate(entry.timestamp);
+        logList.appendChild(node);
+      }
+      if (logList.lastElementChild) {
+        logList.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    }
+
+    function pushLog(entry) {
+      if (!entry) return;
+      logs.push(entry);
+      if (logs.length > 100) logs = logs.slice(-100);
+      renderLogs();
+    }
+
+    function renderReports() {
+      const items = reports.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      reportsList.innerHTML = '';
+      reportCount.textContent = `${items.length} report${items.length === 1 ? '' : 's'}`;
+      if (!items.length) {
+        reportsEmpty.classList.remove('hidden');
+        return;
+      }
+      reportsEmpty.classList.add('hidden');
+      for (const report of items) {
+        const node = reportTpl.content.cloneNode(true);
+        node.querySelector('h3').textContent = report.title || report.id;
+        node.querySelector('p:nth-of-type(1)').textContent = report.description || report.snippet || '';
+        const status = titleCase((report.status || 'completed').replace(/[._-]+/g, ' '));
+        node.querySelector('p:nth-of-type(2)').textContent = `${status} • ${fmtDate(report.createdAt)}`;
+        const button = node.querySelector('button');
+        button.addEventListener('click', () => {
+          location.href = `/report.html?id=${encodeURIComponent(report.id)}`;
+        });
+        reportsList.appendChild(node);
+      }
+    }
+
+    async function bootstrap() {
+      const meResp = await api('/api/me');
+      const me = meResp.user || {};
+      document.getElementById('welcome').textContent = `Welcome, ${me.name?.split(' ')[0] || 'Friend'}!`;
+      document.getElementById('welcome').classList.remove('hidden');
+      document.getElementById('planBadge').textContent = `${planName(me.plan)} plan`;
+      if (me.picture) {
+        const img = document.getElementById('avatar');
+        img.src = me.picture;
+        img.classList.remove('hidden');
+      }
+
+      const vetterResp = await api('/api/vetter');
+      vetterState = vetterResp.vetter || vetterState;
+      logs = Array.isArray(vetterState.logs) ? vetterState.logs.slice() : [];
+      renderStatus(vetterState);
+      renderLogs();
+
+      const reportsResp = await api('/api/reports');
+      reports = Array.isArray(reportsResp.reports) ? reportsResp.reports.slice() : [];
+      renderReports();
+    }
+
+    startBtn.addEventListener('click', async () => {
+      if (startBtn.disabled) return;
+      startBtn.disabled = true;
+      startBtn.textContent = 'Running…';
+      renderStatus({ ...vetterState, active: true });
+      pushLog({ id: `client-${Date.now()}`, level: 'info', message: 'Requesting new vetter run…', timestamp: new Date().toISOString() });
+      try {
+        const payload = await api('/api/vetter/start', { method: 'POST' });
+        const events = Array.isArray(payload.events) ? payload.events : [];
+        for (const entry of events) {
+          pushLog(entry);
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+        vetterState = payload.vetter || vetterState;
+        logs = Array.isArray(vetterState.logs) ? vetterState.logs.slice() : logs;
+        renderStatus(vetterState);
+        renderLogs();
+        if (payload.report) {
+          reports = [payload.report, ...reports.filter((r) => r.id !== payload.report.id)];
+          renderReports();
+        }
+      } catch (err) {
+        if (err.payload?.vetter) {
+          vetterState = err.payload.vetter;
+          logs = Array.isArray(vetterState.logs) ? vetterState.logs.slice() : logs;
+        }
+        pushLog({ id: `err-${Date.now()}`, level: 'error', message: err.message || 'Failed to start vetter.', timestamp: new Date().toISOString() });
+        renderStatus(vetterState);
+      } finally {
+        startBtn.disabled = false;
+        startBtn.textContent = 'Start';
+        renderStatus(vetterState);
+      }
+    });
+
+    lastReportBtn.addEventListener('click', () => {
+      const id = lastReportBtn.dataset.reportId;
+      if (id) {
+        location.href = `/report.html?id=${encodeURIComponent(id)}`;
+      }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
+      location.href = '/login.html';
+    });
+    document.getElementById('settingsBtn').addEventListener('click', () => {
+      location.href = '/settings.html';
+    });
+    document.getElementById('dashboardBtn').addEventListener('click', () => {
+      location.href = '/dashboard.html';
+    });
+
+    bootstrap().catch((err) => {
+      console.error(err);
+      alert('Failed to load union dashboard: ' + err.message);
+    });
+  </script>
+</body>
+</html>

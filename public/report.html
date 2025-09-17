@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Union Report</title>
+  <script src="/theme.js"></script>
+  <script src="/config.js"></script>
+  <script src="/version.js" defer></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html[data-theme="dark"] body { background-color: #0f172a; color: #e2e8f0; }
+    html[data-theme="dark"] header { background-color: #0b1220; border-color: #1f2937; }
+    html[data-theme="dark"] .bg-white { background-color: #0b1220 !important; }
+    html[data-theme="dark"] .bg-slate-50 { background-color: #0f172a !important; }
+    html[data-theme="dark"] .border-slate-200, html[data-theme="dark"] .border-slate-300 { border-color: #1f2937 !important; }
+    html[data-theme="dark"] .text-slate-900 { color: #e2e8f0 !important; }
+    html[data-theme="dark"] .text-slate-600, html[data-theme="dark"] .text-slate-500 { color: #94a3b8 !important; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <header class="w-full bg-white border-b border-slate-200">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <button id="backBtn" class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100" type="button">← Back</button>
+        <div>
+          <h1 class="text-xl font-semibold">Union Report</h1>
+          <p class="text-xs text-slate-500" id="reportId">Loading…</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <img id="avatar" class="h-8 w-8 rounded-full object-cover hidden" alt="avatar" />
+        <button id="logoutBtn" class="text-sm px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800">Log out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+    <section id="errorBox" class="hidden bg-red-100 border border-red-200 text-red-700 rounded-xl p-4 text-sm"></section>
+
+    <section class="bg-white border border-slate-200 rounded-xl p-6">
+      <p class="text-xs text-slate-500 uppercase tracking-wide">Overview</p>
+      <h2 id="reportTitle" class="mt-2 text-2xl font-semibold">Loading report…</h2>
+      <p id="reportMeta" class="mt-2 text-sm text-slate-600">—</p>
+      <p id="reportDescription" class="mt-4 text-base text-slate-700"></p>
+    </section>
+
+    <section id="highlightsSection" class="hidden bg-white border border-slate-200 rounded-xl p-6">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Key highlights</h3>
+      </div>
+      <ul id="highlightsList" class="mt-4 space-y-3 list-disc pl-5"></ul>
+    </section>
+
+    <section id="actionsSection" class="hidden bg-white border border-slate-200 rounded-xl p-6">
+      <h3 class="text-lg font-semibold">Suggested next actions</h3>
+      <ul id="actionsList" class="mt-4 space-y-3 list-disc pl-5"></ul>
+    </section>
+  </main>
+
+  <script>
+    const fmtDate = (iso) => {
+      if (!iso) return '—';
+      try { return new Date(iso).toLocaleString(); } catch { return iso; }
+    };
+    const titleCase = (s = '') => s.replace(/\b([a-z])/g, (m) => m.toUpperCase());
+
+    async function api(path, opts) {
+      const res = await fetch(path, { credentials: 'include', ...opts });
+      if (res.status === 401) {
+        location.href = '/login.html';
+        throw new Error('Not authenticated');
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const message = data?.error || data?.message || 'Request failed';
+        const err = new Error(message);
+        err.payload = data;
+        err.status = res.status;
+        throw err;
+      }
+      return data;
+    }
+
+    const params = new URLSearchParams(location.search);
+    const reportId = params.get('id');
+
+    const reportIdLabel = document.getElementById('reportId');
+    const reportTitle = document.getElementById('reportTitle');
+    const reportMeta = document.getElementById('reportMeta');
+    const reportDescription = document.getElementById('reportDescription');
+    const highlightsSection = document.getElementById('highlightsSection');
+    const highlightsList = document.getElementById('highlightsList');
+    const actionsSection = document.getElementById('actionsSection');
+    const actionsList = document.getElementById('actionsList');
+    const errorBox = document.getElementById('errorBox');
+
+    function showError(message) {
+      errorBox.textContent = message;
+      errorBox.classList.remove('hidden');
+    }
+
+    function renderReport(report) {
+      reportIdLabel.textContent = report.id || 'Unknown report';
+      reportTitle.textContent = report.title || 'Union report';
+      const status = titleCase((report.status || 'completed').replace(/[._-]+/g, ' '));
+      reportMeta.textContent = `${status} • ${fmtDate(report.createdAt)}`;
+      reportDescription.textContent = report.description || report.snippet || 'No description available.';
+
+      const highlights = report.meta?.highlights || [];
+      const actions = report.meta?.actions || [];
+
+      if (highlights.length) {
+        highlightsSection.classList.remove('hidden');
+        highlightsList.innerHTML = '';
+        highlights.forEach((item) => {
+          const li = document.createElement('li');
+          li.textContent = item;
+          highlightsList.appendChild(li);
+        });
+      }
+      if (actions.length) {
+        actionsSection.classList.remove('hidden');
+        actionsList.innerHTML = '';
+        actions.forEach((item) => {
+          const li = document.createElement('li');
+          li.textContent = item;
+          actionsList.appendChild(li);
+        });
+      }
+    }
+
+    async function bootstrap() {
+      if (!reportId) {
+        showError('Missing report id.');
+        reportTitle.textContent = 'No report selected';
+        return;
+      }
+      reportIdLabel.textContent = reportId;
+
+      const meResp = await api('/api/me');
+      const me = meResp.user || {};
+      if (me.picture) {
+        const avatar = document.getElementById('avatar');
+        avatar.src = me.picture;
+        avatar.classList.remove('hidden');
+      }
+
+      try {
+        const reportResp = await api(`/api/reports/${encodeURIComponent(reportId)}`);
+        renderReport(reportResp.report || {});
+      } catch (err) {
+        showError(err.message || 'Failed to load report.');
+        reportTitle.textContent = 'Unable to load report';
+      }
+    }
+
+    document.getElementById('backBtn').addEventListener('click', () => {
+      if (document.referrer && document.referrer.startsWith(window.location.origin)) {
+        history.back();
+      } else {
+        location.href = '/union-dashboard.html';
+      }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
+      location.href = '/login.html';
+    });
+
+    bootstrap().catch((err) => {
+      console.error(err);
+      showError('Failed to load report: ' + err.message);
+    });
+  </script>
+</body>
+</html>
