@@ -48,6 +48,8 @@ if (BUILD_COMMIT) {
   PUBLIC_CONFIG.BUILD_COMMIT = BUILD_COMMIT;
 }
 
+const isTestMode = process.argv.includes("--test");
+
 // ───────────────────────────────────────────────────────────────────────────────
 // core middleware
 // ───────────────────────────────────────────────────────────────────────────────
@@ -158,7 +160,7 @@ app.use(errorHandler);
 // ───────────────────────────────────────────────────────────────────────────────
 // start
 // ───────────────────────────────────────────────────────────────────────────────
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   const nets = os.networkInterfaces();
   const addrs = [];
   for (const name of Object.keys(nets)) {
@@ -169,6 +171,11 @@ app.listen(PORT, HOST, () => {
   console.log("InboxVetter server up:");
   console.log(`  Local - http://localhost:${PORT}`);
   addrs.forEach((ip) => console.log(`  LAN   - http://${ip}:${PORT}`));
+
+  if (isTestMode) {
+    console.log("Test mode detected; shutting down after successful start.");
+    return server.close(() => process.exit(0));
+  }
 
   scheduler.bootstrap().catch((err) => {
     console.error("Scheduler bootstrap failed:", err);

@@ -23,7 +23,7 @@
         "maxPdfTextChars": 4000,
         "model": "gpt-4.1-mini",
         "safeMode": true,
-        "gmailQuery": "label:inbox",
+        "gmailQuery": "newer_than:7d",
         "gmailMaxResults": 200
       },
       "integrations": {
@@ -34,9 +34,40 @@
       },
       "vetter": {
         "active": false,
-        "lastRunAt": null,
-        "lastReportId": null,
-        "logs": []
+        "lastRunAt": "2025-09-17T22:52:50.326Z",
+        "lastReportId": "union-1758149570326-0xgz",
+        "logs": [
+          {
+            "id": "log-1758149570326-d8768d",
+            "level": "info",
+            "message": "Starting InboxVetter union run…",
+            "timestamp": "2025-09-17T22:52:50.326Z"
+          },
+          {
+            "id": "log-1758149570326-mxyxk9",
+            "level": "info",
+            "message": "Gathering recent inbox activity.",
+            "timestamp": "2025-09-17T22:52:50.326Z"
+          },
+          {
+            "id": "log-1758149570326-j33b1c",
+            "level": "info",
+            "message": "Prioritizing opportunities and alerts.",
+            "timestamp": "2025-09-17T22:52:50.326Z"
+          },
+          {
+            "id": "log-1758149570326-969dh0",
+            "level": "info",
+            "message": "Report ready: Revenue tracking update.",
+            "timestamp": "2025-09-17T22:52:50.326Z"
+          },
+          {
+            "id": "log-1758149570326-alqkt2",
+            "level": "success",
+            "message": "InboxVetter run completed.",
+            "timestamp": "2025-09-17T22:52:50.326Z"
+          }
+        ]
       }
     },
     {
@@ -199,6 +230,25 @@
       "description": "New login detected from Frankfurt, Germany.",
       "status": "urgent",
       "snippet": "We noticed a new sign-in on your InboxVetter account from a Chrome browser in Frankfurt."
+    },
+    {
+      "id": "union-1758149570326-0xgz",
+      "email": "naquangaston@gmail.com",
+      "title": "Revenue tracking update",
+      "description": "Payouts from affiliate partners cleared overnight.",
+      "snippet": "Payouts from affiliate partners cleared overnight. Log the CreatorStack payment in the ledger.",
+      "status": "completed",
+      "createdAt": "2025-09-17T22:52:50.326Z",
+      "meta": {
+        "highlights": [
+          "Payouts from affiliate partners cleared overnight."
+        ],
+        "actions": [
+          "Log the CreatorStack payment in the ledger.",
+          "Send thank-you notes to top referrers."
+        ],
+        "generatedAt": "2025-09-17T22:52:50.326Z"
+      }
     }
   ],
   "transactions": []
