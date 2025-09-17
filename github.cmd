@@ -1,7 +1,4 @@
-@echo off
-setlocal EnableExtensions EnableDelayedExpansion
-
-REM ==============================
+@echo offsREM ==============================
 REM InboxVetter GitHub Push Script
 REM ==============================
 
@@ -16,32 +13,22 @@ if %ERRORLEVEL% neq 0 (
   exit /b 1
 )
 
-REM Parse commit message from arguments (expect -m "message")
-set "MESSAGE="
+REM Parse commit message from arguments
+set MESSAGE=
 :parse_args
 if "%~1"=="" goto args_done
 if /i "%~1"=="-m" (
   shift
-  if "%~1"=="" goto missing_message
-  set "MESSAGE=%~1"
+  set MESSAGE=%~1
   shift
-  goto collect_message
+  goto parse_args
+) else (
+  shift
+  goto parse_args
 )
-shift
-goto parse_args
-
-:collect_message
-if "%~1"=="" goto args_done
-set "MESSAGE=!MESSAGE! %~1"
-shift
-goto collect_message
-
-:missing_message
-echo No commit message provided. Use: github.cmd -m "your message"
-exit /b 1
-
 :args_done
-if not defined MESSAGE (
+
+if "%MESSAGE%"=="" (
   echo No commit message provided. Use: github.cmd -m "your message"
   exit /b 1
 )
@@ -50,11 +37,7 @@ REM Stage all changes
 git add -A
 
 REM Commit
-git commit -m "!MESSAGE!"
-if %ERRORLEVEL% neq 0 (
-  echo Commit failed. Aborting push.
-  exit /b 1
-)
+git commit -m "%MESSAGE%"
 
 REM Ensure remote is set
 git remote -v | find "origin" >nul
@@ -64,13 +47,12 @@ if %ERRORLEVEL% neq 0 (
 
 REM Push to main branch
 git push -u origin main
-if %ERRORLEVEL% neq 0 (
-  echo Push failed.
-  exit /b 1
-)
 
 echo.
 echo ==============================
-echo   Push complete with message: !MESSAGE!
+echo   Push complete with message: %MESSAGE%
 echo ==============================
-endlocal
+sage: %MESSAGE%
+echo ==============================
+sage: %MESSAGE%
+echo ==============================
