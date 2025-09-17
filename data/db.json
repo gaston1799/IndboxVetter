@@ -9,9 +9,9 @@
       "plan": "creator",
       "subscription": {
         "plan": "creator",
-        "status": "active",
+        "status": "scheduled_for_cancellation",
         "seats": 1,
-        "renewsAt": "2024-12-01T12:00:00.000Z"
+        "renewsAt": "2025-10-17T04:54:59.000Z"
       },
       "settings": {
         "openaiKey": "",

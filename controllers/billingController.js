@@ -147,6 +147,7 @@ exports.handleStripeWebhook = (req, res) => {
           plan: "pro",
           status: "active",
           stripeSubscriptionId: session.subscription,
+          stripeCustomerId: session.customer || null,
         });
         console.log("✅ Subscription started for:", email, subscription);
       }
@@ -178,4 +179,77 @@ exports.handleStripeWebhook = (req, res) => {
   }
 
   res.json({ received: true });
+};
+
+exports.createPortal = async (req, res) => {
+  const email = ensureEmail(req, res);
+  if (!email) return;
+  try {
+    // Try to use stored customer ID
+    const sub = getSubscriptionFromStore(email);
+    let customerId = sub && sub.stripeCustomerId;
+
+    if (!customerId) {
+      // Fallback: find customer by email (best-effort)
+      const customers = await stripe.customers.list({ email, limit: 1 });
+      customerId = customers?.data?.[0]?.id || null;
+    }
+    if (!customerId) return res.status(400).json({ ok: false, error: 'No Stripe customer found for this user.' });
+
+    const urlBase = `${req.protocol}://${req.get('host')}`;
+    const portal = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${urlBase}/settings.html`,
+    });
+    res.json({ ok: true, url: portal.url });
+  } catch (err) {
+    console.error('Portal error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+};
+
+exports.cancelAtPeriodEnd = async (req, res) => {
+  const email = ensureEmail(req, res);
+  if (!email) return;
+  try {
+    let sub = getSubscriptionFromStore(email);
+    let subId = sub && sub.stripeSubscriptionId;
+    let customerId = sub && sub.stripeCustomerId;
+
+    if (!customerId) {
+      const customers = await stripe.customers.list({ email, limit: 1 });
+      customerId = customers?.data?.[0]?.id || null;
+      if (customerId && (!sub || sub.stripeCustomerId !== customerId)) {
+        sub = updateSubscriptionInStore(email, { stripeCustomerId: customerId });
+      }
+    }
+
+    if (!subId && customerId) {
+      const stripeSubs = await stripe.subscriptions.list({
+        customer: customerId,
+        status: 'all',
+        limit: 1,
+      });
+      subId = stripeSubs?.data?.[0]?.id || null;
+      if (subId) {
+        sub = updateSubscriptionInStore(email, { stripeSubscriptionId: subId });
+      }
+    }
+
+    if (!subId) {
+      return res.status(400).json({ ok: false, error: 'No Stripe subscription on file.' });
+    }
+
+    const updated = await stripe.subscriptions.update(subId, { cancel_at_period_end: true });
+    const next = updateSubscriptionInStore(email, {
+      status: 'scheduled_for_cancellation',
+      renewsAt: updated.current_period_end ? new Date(updated.current_period_end * 1000).toISOString() : sub.renewsAt || null,
+      stripeSubscriptionId: subId,
+      stripeCustomerId: customerId || sub.stripeCustomerId || null,
+    });
+    res.json({ ok: true, subscription: next });
+  } catch (err) {
+    console.error('Cancel error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 };

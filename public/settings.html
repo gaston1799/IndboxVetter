@@ -59,9 +59,11 @@
             <p class="mt-3 text-sm font-medium">Premium tier</p>
           </label>
         </fieldset>
-        <div class="flex gap-2 md:justify-between items-center">
-          <div class="text-sm text-slate-500">Need to subscribe? Use <a href="/checkout.html">Checkout</a> or <a href="/devtest.html">DevTest</a>.</div>
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div class="text-sm text-slate-500">New here? Use <a href="/checkout.html">Checkout</a> or <a href="/devtest.html">DevTest</a> to start a subscription.</div>
           <div class="flex gap-2 md:justify-end">
+            <button type="button" id="manageBillingBtn" class="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-100 text-sm">Manage billing</button>
+            <button type="button" id="cancelPlanBtn" class="inline-flex items-center px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-sm">Cancel plan</button>
             <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 text-sm">Update plan</button>
             <span id="planStatusMessage" class="text-sm text-slate-500 self-center"></span>
           </div>
@@ -69,7 +71,7 @@
       </form>
     </section>
 
-    <section class="bg-white border border-slate-200 rounded-xl p-6 space-y-5">
+    <section id="prefsSection" class="bg-white border border-slate-200 rounded-xl p-6 space-y-5" style="display:none">
       <div>
         <h2 class="text-lg font-semibold">Preferences</h2>
         <p class="text-sm text-slate-500">These settings are stored server-side so you can pick up where you left off from any device.</p>
@@ -152,6 +154,7 @@
     const planCards = Array.from(document.querySelectorAll('[data-plan-card]'));
     const planStatusMessage = document.getElementById('planStatusMessage');
     const subscriptionSummary = document.getElementById('subscriptionSummary');
+    const prefsSection = document.getElementById('prefsSection');
     const preferencesForm = document.getElementById('preferencesForm');
     const preferencesStatus = document.getElementById('preferencesStatus');
     const modelSelect = document.getElementById('modelSelect');
@@ -203,14 +206,21 @@
       return res.json();
     }
 
+    let currentSub = null;
     function updateSubscriptionUI(subscription) {
       if (!subscription) return;
+      currentSub = subscription;
       const summary = `${planName(subscription.plan)} • ${titleCase((subscription.status || 'inactive').replace(/[._-]+/g, ' '))}`;
       subscriptionSummary.textContent = subscription.renewsAt
         ? `${summary} • Renews ${fmtDate(subscription.renewsAt)}`
         : summary;
       selectPlan(subscription.plan || 'basic');
       planStatusMessage.textContent = '';
+
+      const activeStatuses = new Set(['active','trialing','scheduled_for_cancellation']);
+      const paidPlans = new Set(['basic','pro']);
+      const showPrefs = paidPlans.has((subscription.plan || '').toLowerCase()) && activeStatuses.has((subscription.status || '').toLowerCase());
+      prefsSection.style.display = showPrefs ? '' : 'none';
     }
 
     async function bootstrap() {
@@ -218,33 +228,39 @@
       const me = meResp.user || {};
       document.getElementById('userEmail').textContent = me.email || '—';
 
-      const settingsResp = await api('/api/settings');
-      const settings = settingsResp.settings || {};
-      preferencesForm.openaiKey.value = settings.openaiKey || '';
-      preferencesForm.omittedSenders.value = settings.omittedSenders || '';
-      preferencesForm.importantDesc.value = settings.importantDesc || '';
-      preferencesForm.allowAttachments.checked = settings.allowAttachments ?? true;
-      preferencesForm.maxAttachmentMB.value = settings.maxAttachmentMB ?? 5;
-      preferencesForm.maxImages.value = settings.maxImages ?? 3;
-      preferencesForm.maxPdfTextChars.value = settings.maxPdfTextChars ?? 4000;
-      const known = new Set(['', 'gpt-4.1-mini', 'gpt-4.1', 'gpt-5', 'o3-mini', 'o3', 'gpt-4o-mini', 'gpt-4o']);
-      const model = (settings.model || '').trim();
-      if (known.has(model)) {
-        modelSelect.value = model;
-        customModelWrap.style.display = 'none';
-        preferencesForm.customModel.value = '';
-      } else if (model) {
-        modelSelect.value = '__custom';
-        customModelWrap.style.display = '';
-        preferencesForm.customModel.value = model;
-      } else {
-        modelSelect.value = '';
-        customModelWrap.style.display = 'none';
-        preferencesForm.customModel.value = '';
-      }
-
       const subscriptionResp = await api('/billing/subscription');
-      updateSubscriptionUI(subscriptionResp.subscription);
+      const sub = subscriptionResp.subscription || {};
+      updateSubscriptionUI(sub);
+
+      const activeStatuses = new Set(['active','trialing','scheduled_for_cancellation']);
+      const paidPlans = new Set(['basic','pro']);
+      const showPrefs = paidPlans.has((sub.plan || '').toLowerCase()) && activeStatuses.has((sub.status || '').toLowerCase());
+      if (showPrefs) {
+        const settingsResp = await api('/api/settings');
+        const settings = settingsResp.settings || {};
+        preferencesForm.openaiKey.value = settings.openaiKey || '';
+        preferencesForm.omittedSenders.value = settings.omittedSenders || '';
+        preferencesForm.importantDesc.value = settings.importantDesc || '';
+        preferencesForm.allowAttachments.checked = settings.allowAttachments ?? true;
+        preferencesForm.maxAttachmentMB.value = settings.maxAttachmentMB ?? 5;
+        preferencesForm.maxImages.value = settings.maxImages ?? 3;
+        preferencesForm.maxPdfTextChars.value = settings.maxPdfTextChars ?? 4000;
+        const known = new Set(['', 'gpt-4.1-mini', 'gpt-4.1', 'gpt-5', 'o3-mini', 'o3', 'gpt-4o-mini', 'gpt-4o']);
+        const model = (settings.model || '').trim();
+        if (known.has(model)) {
+          modelSelect.value = model;
+          customModelWrap.style.display = 'none';
+          preferencesForm.customModel.value = '';
+        } else if (model) {
+          modelSelect.value = '__custom';
+          customModelWrap.style.display = '';
+          preferencesForm.customModel.value = model;
+        } else {
+          modelSelect.value = '';
+          customModelWrap.style.display = 'none';
+          preferencesForm.customModel.value = '';
+        }
+      }
     }
 
     planForm.addEventListener('change', (event) => {
@@ -259,14 +275,38 @@
       const plan = formData.get('plan') || 'basic';
       planStatusMessage.textContent = 'Saving…';
       try {
-        const resp = await api('/billing/subscription', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ plan }),
-        });
-        updateSubscriptionUI(resp.subscription);
-        planStatusMessage.textContent = 'Plan updated ✓';
-        setTimeout(() => (planStatusMessage.textContent = ''), 2000);
+        const activeStatuses = new Set(['active','trialing','scheduled_for_cancellation']);
+        const paidPlans = new Set(['basic','pro']);
+        const curPlan = (currentSub?.plan || '').toLowerCase();
+        const curActive = activeStatuses.has((currentSub?.status || '').toLowerCase());
+        const wantsPaid = paidPlans.has(plan.toLowerCase());
+        if (wantsPaid) {
+          if (curActive && currentSub?.stripeSubscriptionId) {
+            planStatusMessage.textContent = 'Opening billing portal to switch plan…';
+            const portal = await api('/billing/portal', { method: 'POST' });
+            if (portal?.url) { location.href = portal.url; return; }
+            throw new Error('Unable to open billing portal');
+          } else {
+            planStatusMessage.textContent = 'Starting checkout…';
+            const co = await api('/billing/checkout', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ plan }),
+            });
+            if (co?.url) { location.href = co.url; return; }
+            throw new Error('Unable to start checkout');
+          }
+        } else {
+          // Non-paid plan; just update our local store
+          const resp = await api('/billing/subscription', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan }),
+          });
+          updateSubscriptionUI(resp.subscription);
+          planStatusMessage.textContent = 'Plan updated ✓';
+          setTimeout(() => (planStatusMessage.textContent = ''), 2000);
+        }
       } catch (err) {
         console.error(err);
         planStatusMessage.textContent = err.message;
@@ -300,6 +340,38 @@
       } catch (err) {
         console.error(err);
         preferencesStatus.textContent = err.message;
+      }
+    });
+
+    // Manage billing (Stripe Customer Portal)
+    document.getElementById('manageBillingBtn').addEventListener('click', async () => {
+      planStatusMessage.textContent = 'Opening billing portal…';
+      try {
+        const res = await api('/billing/portal', { method: 'POST' });
+        if (res && res.url) {
+          location.href = res.url;
+        } else {
+          throw new Error('Failed to create portal session');
+        }
+      } catch (err) {
+        console.error(err);
+        planStatusMessage.textContent = err.message;
+        setTimeout(() => (planStatusMessage.textContent = ''), 4000);
+      }
+    });
+
+    // Cancel subscription (at period end)
+    document.getElementById('cancelPlanBtn').addEventListener('click', async () => {
+      if (!confirm('Cancel your subscription at period end?')) return;
+      planStatusMessage.textContent = 'Submitting cancel…';
+      try {
+        const res = await api('/billing/cancel', { method: 'POST' });
+        updateSubscriptionUI(res.subscription);
+        planStatusMessage.textContent = 'Cancellation scheduled ✓';
+        setTimeout(() => (planStatusMessage.textContent = ''), 4000);
+      } catch (err) {
+        console.error(err);
+        planStatusMessage.textContent = err.message;
       }
     });
 
