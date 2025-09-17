@@ -5,6 +5,7 @@ const {
 const { stripe, WEBHOOK_SECRET } = require("../config/stripe");
 const PRICE_BASIC = process.env.STRIPE_PRICE_ID;
 const PRICE_PRO = process.env.STRIPE_PRICE_ID_PREMIUM;
+const DONATION_PRODUCT_NAME = "Support InboxVetter";
 
 function ensureEmail(req, res) {
   const email = req.session?.user?.email;
@@ -58,6 +59,61 @@ exports.startCheckout = async (req, res) => {
     res.json({ ok: true, url: session.url, id: session.id });
   } catch (err) {
     console.error('Checkout error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+};
+
+exports.startSupportCheckout = async (req, res) => {
+  const email = ensureEmail(req, res);
+  if (!email) return;
+
+  const rawAmount = req.body?.amount;
+  const amountNumber = typeof rawAmount === "string" ? parseFloat(rawAmount) : Number(rawAmount);
+  const amountInCents = Math.round((amountNumber || 0) * 100);
+
+  if (!Number.isFinite(amountNumber) || amountInCents < 100) {
+    return res.status(400).json({
+      ok: false,
+      error: "Donation amount must be at least $1",
+    });
+  }
+
+  if (amountInCents > 1000000) {
+    return res.status(400).json({
+      ok: false,
+      error: "Donation amount is too large",
+    });
+  }
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      customer_email: email,
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: amountInCents,
+            product_data: {
+              name: DONATION_PRODUCT_NAME,
+            },
+          },
+        },
+      ],
+      metadata: {
+        email,
+        type: "donation",
+        amount_cents: amountInCents.toString(),
+      },
+      success_url: `${req.protocol}://${req.get("host")}/supportme.html?success=1`,
+      cancel_url: `${req.protocol}://${req.get("host")}/supportme.html?canceled=1`,
+    });
+
+    res.json({ ok: true, url: session.url, id: session.id });
+  } catch (err) {
+    console.error("Support checkout error:", err);
     res.status(500).json({ ok: false, error: err.message });
   }
 };
