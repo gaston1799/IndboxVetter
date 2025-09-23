@@ -1,6 +1,7 @@
 "use strict";
 
-const { runInboxOnce, MissingGmailTokensError, summarizeAttachments } = require("./inboxRunner");
+const { GmailTokenMissingError } = require("./inboxRunner");
+const { runScheduledInbox } = require("../modules/inbox/orchestrator");
 const { loadTokens } = require("./gmailTokenStore");
 const {
   listUsers,
@@ -22,37 +23,6 @@ function normalizeInterval(ms) {
 function hasTokens(email) {
   const tokens = loadTokens(email);
   return !!tokens;
-}
-
-function actionToStatus(action) {
-  if (action === "IMPORTANT") return "urgent";
-  if (action === "TRASH") return "completed";
-  return "needs_review";
-}
-
-function toReportRecords(email, run) {
-  if (!run?.results?.length) return [];
-  const createdAt = run.runAt || new Date().toISOString();
-  return run.results.map((item) => ({
-    id: item.id,
-    createdAt: item.receivedAt || createdAt,
-    title: item.subject || "(no subject)",
-    description: item.reason || "",
-    status: actionToStatus(item.action),
-    snippet: `${item.action} • ${(item.reason || "").slice(0, 160)}`,
-    meta: {
-      action: item.action,
-      isScam: item.is_scam,
-      isImportant: item.is_important,
-      confidence: item.confidence,
-      labelsApplied: item.labelsApplied,
-      attachments: item.attachments,
-      attachmentsSummary: summarizeAttachments(item.attachments),
-      receivedAt: item.receivedAt,
-      runAt: run.runAt,
-      reportPath: run.reportPath,
-    },
-  }));
 }
 
 async function runJob(job) {
@@ -188,6 +158,7 @@ module.exports = {
   bootstrap,
   getJob,
 };
+
 
 
 

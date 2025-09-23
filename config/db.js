@@ -29,6 +29,8 @@ const DEFAULT_VETTER_STATE = {
   active: false,
   lastRunAt: null,
   lastReportId: null,
+  nextRunAt: null,
+  processedMessageIds: [],
   logs: [],
 };
 
@@ -206,6 +208,14 @@ function ensureUserDefaults(user) {
     }
     if (!("lastReportId" in user.vetter)) {
       user.vetter.lastReportId = null;
+      changed = true;
+    }
+    if (!("nextRunAt" in user.vetter)) {
+      user.vetter.nextRunAt = null;
+      changed = true;
+    }
+    if (!Array.isArray(user.vetter.processedMessageIds)) {
+      user.vetter.processedMessageIds = [];
       changed = true;
     }
     if (!Array.isArray(user.vetter.logs)) {
@@ -506,6 +516,7 @@ function sanitizeVetterState(state = {}) {
     active: Boolean(state.active),
     lastRunAt: state.lastRunAt || null,
     lastReportId: state.lastReportId || null,
+    nextRunAt: state.nextRunAt || null,
     logs: Array.isArray(state.logs) ? state.logs.slice(-100) : [],
   };
 }
@@ -533,116 +544,69 @@ function appendVetterLog(user, message, level = "info") {
   }
   return entry;
 }
-
-const SAMPLE_VETTER_THEMES = [
-  {
-    topic: "Sponsorship opportunities",
-    highlight: "Brand partnerships are lining up for next quarter.",
-    actions: [
-      "Review the Flowgear proposal and respond by Friday.",
-      "Prepare rate card update for premium sponsors.",
-    ],
-  },
-  {
-    topic: "Community engagement",
-    highlight: "Audience replies are trending 22% higher this week.",
-    actions: [
-      "Schedule a Q&A livestream to capitalize on momentum.",
-      "Tag top fans for early access to the new course drop.",
-    ],
-  },
-  {
-    topic: "Security & compliance",
-    highlight: "Security alerts need acknowledgement in the next 24 hours.",
-    actions: [
-      "Confirm the Frankfurt login attempt was legitimate.",
-      "Rotate backup codes and archive the incident summary.",
-    ],
-  },
-  {
-    topic: "Revenue tracking",
-    highlight: "Payouts from affiliate partners cleared overnight.",
-    actions: [
-      "Log the CreatorStack payment in the ledger.",
-      "Send thank-you notes to top referrers.",
-    ],
-  },
-];
-
-function pickSampleTheme() {
-  const idx = Math.floor(Math.random() * SAMPLE_VETTER_THEMES.length);
-  return SAMPLE_VETTER_THEMES[idx];
+function computeNextRun(lastRunAt) {
+  const base = lastRunAt ? new Date(lastRunAt) : new Date();
+  if (!Number.isFinite(base.getTime())) {
+    return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  }
+  base.setDate(base.getDate() + 7);
+  return base.toISOString();
 }
 
-function startVetterRun(email) {
+function beginVetterRun(email) {
   const ctx = getUserInternal(email);
   if (!ctx) return null;
-
   if (ensureUserDefaults(ctx.user)) {
     writeDB(ctx.db);
   }
-
   if (ctx.user.vetter.active) {
-    return { alreadyActive: true, vetter: sanitizeVetterState(ctx.user.vetter) };
+    return { alreadyActive: true, ctx, vetter: sanitizeVetterState(ctx.user.vetter) };
   }
-
   ctx.user.vetter.active = true;
-  ctx.user.vetter.lastRunAt = new Date().toISOString();
-  const newLogs = [];
+  appendVetterLog(ctx.user, "Starting InboxVetter run...");
+  writeDB(ctx.db);
+  return { alreadyActive: false, ctx, vetter: sanitizeVetterState(ctx.user.vetter) };
+}
 
-  const push = (message, level = "info") => {
-    const entry = appendVetterLog(ctx.user, message, level);
-    newLogs.push(entry);
-    return entry;
-  };
-
-  push("Starting InboxVetter union run…");
-  push("Gathering recent inbox activity.");
-  push("Prioritizing opportunities and alerts.");
-
-  const theme = pickSampleTheme();
-  const createdAt = new Date().toISOString();
-  const report = {
-    id: `union-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    email,
-    title: `${theme.topic} update`,
-    description: theme.highlight,
-    snippet: `${theme.highlight} ${theme.actions[0]}`,
-    status: "completed",
-    createdAt,
-    meta: {
-      highlights: [theme.highlight],
-      actions: theme.actions,
-      generatedAt: createdAt,
-    },
-  };
-
-  if (!Array.isArray(ctx.db.reports)) ctx.db.reports = [];
-  ctx.db.reports.push(report);
-
-  push(`Report ready: ${report.title}.`);
-
-  ctx.user.vetter.active = false;
-  ctx.user.vetter.lastReportId = report.id;
-  ctx.user.vetter.lastRunAt = createdAt;
-  if (!Array.isArray(ctx.user.vetter.logs)) {
-    ctx.user.vetter.logs = [];
+function finalizeVetterRun(ctx, { reportRecord, processedMessageIds, logs = [], nextRunAt }) {
+  if (!ctx) return null;
+  const now = new Date().toISOString();
+  const recordCreated = reportRecord?.createdAt || now;
+  if (reportRecord) {
+    saveReports(ctx.user.email, [reportRecord]);
+    ctx.user.vetter.lastReportId = reportRecord.id;
   }
+  if (Array.isArray(processedMessageIds)) {
+    ctx.user.vetter.processedMessageIds = processedMessageIds.slice(-5000);
+  }
+  ctx.user.vetter.active = false;
+  ctx.user.vetter.lastRunAt = recordCreated;
+  ctx.user.vetter.nextRunAt = nextRunAt || computeNextRun(recordCreated);
+  logs.forEach((entry) => {
+    if (!entry) return;
+    appendVetterLog(ctx.user, entry.message || entry, entry.level || "info");
+  });
   if (ctx.user.vetter.logs.length > 100) {
     ctx.user.vetter.logs = ctx.user.vetter.logs.slice(-100);
   }
-
-  push("InboxVetter run completed.", "success");
-
   writeDB(ctx.db);
+  return sanitizeVetterState(ctx.user.vetter);
+}
 
+function failVetterRun(ctx, errorMessage) {
+  if (!ctx) return null;
+  const entry = appendVetterLog(ctx.user, errorMessage, "error");
+  ctx.user.vetter.active = false;
+  if (ctx.user.vetter.logs.length > 100) {
+    ctx.user.vetter.logs = ctx.user.vetter.logs.slice(-100);
+  }
+  writeDB(ctx.db);
   return {
-    alreadyActive: false,
     vetter: sanitizeVetterState(ctx.user.vetter),
-    events: newLogs,
-    report,
+    logs: [entry],
   };
 }
+
 
 /* TRANSACTIONS (retained for potential auditing) */
 function addTransaction({ email, amount, type, stripeId, meta }) {
@@ -683,10 +647,18 @@ module.exports = {
   saveReports,
   getReport,
   getVetterState,
-  startVetterRun,
+  beginVetterRun,
+  finalizeVetterRun,
+  failVetterRun,
+  computeNextRun,
   addTransaction,
   getTransactions,
 };
+
+
+
+
+
 
 
 

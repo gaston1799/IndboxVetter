@@ -66,8 +66,46 @@
             "level": "success",
             "message": "InboxVetter run completed.",
             "timestamp": "2025-09-17T22:52:50.326Z"
+          },
+          {
+            "id": "log-1758636792702-sz64mq",
+            "level": "info",
+            "message": "Starting InboxVetter run...",
+            "timestamp": "2025-09-23T14:13:12.702Z"
+          },
+          {
+            "id": "log-1758636792706-3f2hr1",
+            "level": "error",
+            "message": "No Gmail tokens stored for naquangaston@gmail.com",
+            "timestamp": "2025-09-23T14:13:12.706Z"
+          },
+          {
+            "id": "log-1758636804371-249617",
+            "level": "info",
+            "message": "Starting InboxVetter run...",
+            "timestamp": "2025-09-23T14:13:24.371Z"
+          },
+          {
+            "id": "log-1758636804375-58cwro",
+            "level": "error",
+            "message": "No Gmail tokens stored for naquangaston@gmail.com",
+            "timestamp": "2025-09-23T14:13:24.375Z"
+          },
+          {
+            "id": "log-1758639534958-yuy74x",
+            "level": "info",
+            "message": "Starting InboxVetter run...",
+            "timestamp": "2025-09-23T14:58:54.958Z"
+          },
+          {
+            "id": "log-1758639534962-4eot2m",
+            "level": "error",
+            "message": "No Gmail tokens stored for naquangaston@gmail.com",
+            "timestamp": "2025-09-23T14:58:54.962Z"
           }
-        ]
+        ],
+        "nextRunAt": null,
+        "processedMessageIds": []
       }
     },
     {
@@ -106,7 +144,9 @@
         "active": false,
         "lastRunAt": null,
         "lastReportId": null,
-        "logs": []
+        "logs": [],
+        "nextRunAt": null,
+        "processedMessageIds": []
       }
     },
     {
@@ -145,7 +185,9 @@
         "active": false,
         "lastRunAt": null,
         "lastReportId": null,
-        "logs": []
+        "logs": [],
+        "nextRunAt": null,
+        "processedMessageIds": []
       }
     }
   ],

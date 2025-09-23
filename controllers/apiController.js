@@ -5,8 +5,8 @@ const {
   listReports: listReportsFromStore,
   getReport: getReportFromStore,
   getVetterState,
-  startVetterRun,
 } = require("../config/db");
+const { runManualInbox } = require("../modules/inbox/orchestrator");
 
 exports.getMe = (req, res) => {
   const email = req.session?.user?.email;
@@ -38,24 +38,48 @@ exports.getVetter = (req, res) => {
   res.json({ ok: true, vetter });
 };
 
-exports.startVetter = (req, res) => {
+exports.startVetter = async (req, res) => {
   const email = req.session?.user?.email;
   if (!email) return res.status(401).json({ ok: false, error: "Not authenticated" });
-  const result = startVetterRun(email);
-  if (!result) {
-    return res.status(404).json({ ok: false, error: "User not found" });
+
+  try {
+    const result = await runManualInbox(email);
+    if (!result) {
+      return res.status(500).json({ ok: false, error: "Failed to start InboxVetter" });
+    }
+
+    if (result.alreadyActive) {
+      return res
+        .status(409)
+        .json({ ok: false, error: "InboxVetter is already running", vetter: result.vetter });
+    }
+
+    if (!result.ok) {
+      const message =
+        typeof result.error === "string"
+          ? result.error
+          : result.error?.message || "Failed to start InboxVetter";
+      const status = message === "User not found" ? 404 : 500;
+      return res.status(status).json({
+        ok: false,
+        error: message,
+        vetter: result.vetter || null,
+        events: result.events || [],
+      });
+    }
+
+    return res.json({
+      ok: true,
+      vetter: result.vetter || null,
+      events: result.events || [],
+      report: result.report || null,
+      stats: result.stats || null,
+      descriptor: result.descriptor || null,
+    });
+  } catch (err) {
+    const message = err?.message || "Failed to start InboxVetter";
+    return res.status(500).json({ ok: false, error: message });
   }
-  if (result.alreadyActive) {
-    return res
-      .status(409)
-      .json({ ok: false, error: "InboxVetter is already running", vetter: result.vetter });
-  }
-  res.json({
-    ok: true,
-    vetter: result.vetter,
-    events: result.events,
-    report: result.report,
-  });
 };
 
 exports.getSettings = (req, res) => {
@@ -71,3 +95,5 @@ exports.updateSettings = (req, res) => {
   const settings = updateSettingsInStore(email, req.body || {});
   res.json({ ok: true, settings });
 };
+
+
