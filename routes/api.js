@@ -10,6 +10,7 @@ const {
   getReport,
   getVetter,
   startVetter,
+  getDevInfo,
 } = require("../controllers/apiController");
 
 router.get("/me", requireAuth, getMe);
@@ -19,5 +20,6 @@ router.get("/vetter", requireAuth, getVetter);
 router.post("/vetter/start", requireAuth, startVetter);
 router.get("/settings", requireAuth, getSettings);
 router.post("/settings", requireAuth, updateSettings);
+router.get("/devinfo", requireAuth, getDevInfo);
 
 module.exports = router;
