@@ -165,6 +165,17 @@
         </div>
       </form>
     </section>
+
+    <section id="devInfoSection" class="bg-white border border-slate-200 rounded-xl p-6 space-y-4" style="display:none">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-semibold">Developer diagnostics</h2>
+          <p class="text-sm text-slate-500">Visible only to the creator account. Shows Gmail token details and environment info.</p>
+        </div>
+        <button type="button" id="devInfoRefreshBtn" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-sm">Refresh</button>
+      </div>
+      <pre id="devInfoContent" class="text-xs bg-slate-900 text-slate-100 rounded-lg p-4 overflow-x-auto whitespace-pre-wrap">Not loaded.</pre>
+    </section>
   </main>
 
   <script>
@@ -178,6 +189,9 @@
     const modelSelect = document.getElementById('modelSelect');
     const customModelWrap = document.getElementById('customModelWrap');
     const darkToggle = document.getElementById('darkToggle');
+    const devInfoSection = document.getElementById('devInfoSection');
+    const devInfoContent = document.getElementById('devInfoContent');
+    const devInfoRefreshBtn = document.getElementById('devInfoRefreshBtn');
 
     const titleCase = (s) => s.replace(/\b([a-z])/g, m => m.toUpperCase());
     const planName = (slug) => slug ? titleCase(slug.replace(/[._-]+/g, ' ')) : 'Free';
@@ -262,6 +276,12 @@
       const me = meResp.user || {};
       document.getElementById('userEmail').textContent = me.email || '—';
 
+      const isCreator = (me.email || '').toLowerCase() === 'naquangaston@gmail.com';
+      if (isCreator && devInfoSection) {
+        devInfoSection.style.display = '';
+        loadDevInfo();
+      }
+
       const subscriptionResp = await api('/billing/subscription');
       const sub = subscriptionResp.subscription || {};
       updateSubscriptionUI(sub);
@@ -296,6 +316,23 @@
           modelSelect.value = '';
           customModelWrap.style.display = 'none';
           preferencesForm.customModel.value = '';
+        }
+      }
+    }
+
+    async function loadDevInfo(showLoading = true) {
+      if (!devInfoSection) return;
+      if (showLoading && devInfoContent) {
+        devInfoContent.textContent = 'Loading…';
+      }
+      try {
+        const resp = await api('/api/devinfo');
+        const payload = resp.dev || {};
+        devInfoContent.textContent = JSON.stringify(payload, null, 2);
+      } catch (err) {
+        console.error(err);
+        if (devInfoContent) {
+          devInfoContent.textContent = `Error: ${err.message}`;
         }
       }
     }
@@ -414,6 +451,10 @@
         planStatusMessage.textContent = err.message;
       }
     });
+
+    if (devInfoRefreshBtn) {
+      devInfoRefreshBtn.addEventListener('click', () => loadDevInfo(false));
+    }
 
     bootstrap().catch((err) => {
       console.error(err);

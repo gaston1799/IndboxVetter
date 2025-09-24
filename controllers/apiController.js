@@ -7,6 +7,16 @@ const {
   getVetterState,
 } = require("../config/db");
 const { runManualInbox } = require("../modules/inbox/orchestrator");
+const { loadTokens } = require("../services/gmailTokenStore");
+const { getUserWorkspace } = require("../services/userStorage");
+const { hasEncryptionKey } = require("../utils/crypto");
+const pkg = require("../package.json");
+
+const CREATOR_EMAIL = (process.env.CREATOR_EMAIL || "naquangaston@gmail.com").toLowerCase();
+
+function isCreator(email) {
+  return (email || "").toLowerCase() === CREATOR_EMAIL;
+}
 
 exports.getMe = (req, res) => {
   const email = req.session?.user?.email;
@@ -94,6 +104,45 @@ exports.updateSettings = (req, res) => {
   if (!email) return res.status(401).json({ ok: false, error: "Not authenticated" });
   const settings = updateSettingsInStore(email, req.body || {});
   res.json({ ok: true, settings });
+};
+
+exports.getDevInfo = (req, res) => {
+  const email = req.session?.user?.email;
+  if (!email) {
+    return res.status(401).json({ ok: false, error: "Not authenticated" });
+  }
+  if (!isCreator(email)) {
+    return res.status(403).json({ ok: false, error: "Dev info restricted" });
+  }
+
+  const tokens = loadTokens(email);
+  const workspace = getUserWorkspace(email);
+  const user = getUser(email);
+
+  const payload = {
+    user,
+    tokens: tokens || null,
+    tokenStatus: tokens ? "available" : "missing",
+    workspace: {
+      slug: workspace.slug,
+      baseDir: workspace.baseDir,
+      tokenPath: workspace.tokenPath,
+      reportDir: workspace.reportDir,
+      logDir: workspace.logDir,
+    },
+    encryption: {
+      hasEncryptionKey: hasEncryptionKey(),
+    },
+    environment: {
+      nodeVersion: process.version,
+      platform: `${process.platform} ${process.arch}`.trim(),
+      nodeEnv: process.env.NODE_ENV || "development",
+      appVersion: pkg.version,
+      now: new Date().toISOString(),
+    },
+  };
+
+  res.json({ ok: true, dev: payload });
 };
 
 
