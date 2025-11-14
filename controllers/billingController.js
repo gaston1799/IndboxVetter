@@ -57,7 +57,26 @@ exports.updateSubscription = (req, res) => {
   const email = ensureEmail(req, res);
   if (!email) return;
 
-  const updates = req.body || {};
+  const body = req.body || {};
+  const updates = {};
+  if (Object.prototype.hasOwnProperty.call(body, "plan")) {
+    const requestedPlan = normalizePlanSlug(body.plan);
+    if (requestedPlan !== "free") {
+      return res.status(400).json({
+        ok: false,
+        error: "Paid plan changes must go through Stripe checkout or the billing portal.",
+      });
+    }
+    updates.plan = "free";
+  }
+
+  if (!Object.keys(updates).length) {
+    return res.status(400).json({
+      ok: false,
+      error: "No subscription changes allowed for this endpoint.",
+    });
+  }
+
   const subscription = updateSubscriptionInStore(email, updates);
 
   if (!subscription) {
