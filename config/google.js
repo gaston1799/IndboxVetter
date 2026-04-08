@@ -11,6 +11,7 @@ async function verifyIdToken(idToken) {
   return {
     sub: p.sub,
     email: p.email,
+    emailVerified: Boolean(p.email_verified),
     name: p.name,
     picture: p.picture,
     exp: p.exp, // seconds since epoch

@@ -5,12 +5,15 @@ const {
   listReports: listReportsFromStore,
   getReport: getReportFromStore,
   getVetterState,
+  updateTimezone: updateTimezoneInStore,
 } = require("../config/db");
 const { runManualInbox } = require("../modules/inbox/orchestrator");
 const { loadTokens } = require("../services/gmailTokenStore");
 const { getUserWorkspace } = require("../services/userStorage");
 const { hasEncryptionKey } = require("../utils/crypto");
+const { summarizeOAuthTokens } = require("../utils/secrets");
 const pkg = require("../package.json");
+const scheduler = require("../services/inboxScheduler");
 
 const CREATOR_EMAIL = (process.env.CREATOR_EMAIL || "naquangaston@gmail.com").toLowerCase();
 
@@ -106,6 +109,24 @@ exports.updateSettings = (req, res) => {
   res.json({ ok: true, settings });
 };
 
+exports.updateTimezone = (req, res) => {
+  const email = req.session?.user?.email;
+  if (!email) return res.status(401).json({ ok: false, error: "Not authenticated" });
+  const timezone = typeof req.body?.timezone === "string" ? req.body.timezone.trim() : "";
+  if (!timezone) {
+    return res.status(400).json({ ok: false, error: "timezone required" });
+  }
+  try {
+    const payload = updateTimezoneInStore(email, timezone);
+    scheduler.startForUser(email, { force: true });
+    res.json({ ok: true, timezone: payload.timezone, nextRunAt: payload.nextRunAt });
+  } catch (err) {
+    const message = err?.message || "Failed to update timezone";
+    const status = message === "Invalid timezone" ? 400 : 500;
+    res.status(status).json({ ok: false, error: message });
+  }
+};
+
 exports.getDevInfo = (req, res) => {
   const email = req.session?.user?.email;
   if (!email) {
@@ -121,7 +142,7 @@ exports.getDevInfo = (req, res) => {
 
   const payload = {
     user,
-    tokens: tokens || null,
+    tokens: summarizeOAuthTokens(tokens),
     tokenStatus: tokens ? "available" : "missing",
     workspace: {
       slug: workspace.slug,

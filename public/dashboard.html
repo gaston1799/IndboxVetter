@@ -28,11 +28,11 @@
         <div class="h-8 w-8 rounded-xl bg-indigo-600"></div>
         <div>
           <h1 class="text-xl font-semibold">InboxVetter</h1>
-          <p class="text-xs text-slate-500" id="planBadge">Loading plan…</p>
+          <p class="text-xs text-slate-500" id="planBadge">Loading plan...</p>
         </div>
       </div>
       <div class="flex items-center gap-4">
-        <span id="welcome" class="hidden sm:inline text-sm text-slate-600">Welcome, …</span>
+        <span id="welcome" class="hidden sm:inline text-sm text-slate-600">Welcome, -</span>
         <button id="unionBtn" class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Union dashboard</button>
         <button id="settingsBtn" class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Settings</button>
         <div class="flex items-center gap-2">
@@ -48,12 +48,33 @@
     <section class="bg-white border border-slate-200 rounded-xl p-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div>
         <p class="text-sm text-slate-500">Current plan</p>
-        <p class="text-lg font-semibold" id="planLabel">—</p>
-        <p class="text-xs text-slate-500" id="planStatus">—</p>
+        <p class="text-lg font-semibold" id="planLabel">-</p>
+        <p class="text-xs text-slate-500" id="planStatus">-</p>
       </div>
       <div class="flex items-center gap-2">
         <a href="/settings.html" class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Open settings</a>
         <button id="managePlanBtn" class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500">Manage plan</button>
+      </div>
+    </section>
+
+    <section id="gmailSection" class="bg-white border border-slate-200 rounded-xl p-5 hidden">
+      <div class="space-y-2">
+        <p class="text-sm text-slate-500">Gmail automation</p>
+        <h2 class="text-lg font-semibold" id="gmailStatusHeading">Checking Gmail tokens...</h2>
+        <p class="text-sm text-slate-500" id="gmailStatusHint">InboxVetter needs access to your Gmail account to label and clean messages automatically.</p>
+        <ol id="gmailSteps" class="list-decimal list-inside text-sm text-slate-500 space-y-1">
+          <li>Click "Connect Gmail" and pick the mailbox you want InboxVetter to manage.</li>
+          <li>Approve Google's permission prompt so we can read, label, and delete spam.</li>
+          <li>Return to the dashboard - automation starts as soon as tokens are stored.</li>
+        </ol>
+        <p id="gmailStatusMessage" class="text-xs text-amber-600 hidden"></p>
+      </div>
+      <div class="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
+        <div class="flex gap-2">
+          <button id="gmailConnectBtn" class="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 text-sm">Connect Gmail</button>
+          <button id="gmailDisconnectBtn" class="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-100 text-sm hidden">Disconnect</button>
+        </div>
+        <button id="gmailRefreshBtn" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-xs md:text-sm">Refresh status</button>
       </div>
     </section>
 
@@ -104,26 +125,40 @@
   </template>
 
   <script>
-    // Helpers
-    const fmtDate = iso => {
-      try { return new Date(iso).toLocaleString(); } catch { return iso || ''; }
+    const fmtDate = (iso) => {
+      if (!iso) return '-';
+      try {
+        return new Date(iso).toLocaleString();
+      } catch {
+        return iso || '-';
+      }
     };
-    const titleCase = s => s.replace(/\b([a-z])/g, m => m.toUpperCase());
-    const planName = slug => slug ? titleCase(slug.replace(/[._-]+/g, ' ')) : 'Free';
-    const normalizePlan = slug => {
+    const titleCase = (s) => s.replace(/\b([a-z])/g, (m) => m.toUpperCase());
+    const planName = (slug) => (slug ? titleCase(slug.replace(/[._-]+/g, ' ')) : 'Free');
+    const normalizePlan = (slug) => {
       const raw = (slug || '').toLowerCase();
       if (!raw) return 'free';
       if (raw === 'creator' || raw === 'base' || raw === 'basic_tier') return 'basic';
       if (raw === 'team' || raw === 'premium' || raw === 'pro_tier') return 'pro';
       return raw;
     };
-    const displayPlan = slug => {
+    const displayPlan = (slug) => {
       const normalized = normalizePlan(slug);
       if (normalized === 'basic') return 'Basic';
       if (normalized === 'pro') return 'Pro';
       if (normalized === 'free') return 'Free';
       return planName(slug || normalized);
     };
+
+    const gmailSection = document.getElementById('gmailSection');
+    const gmailStatusHeading = document.getElementById('gmailStatusHeading');
+    const gmailStatusHint = document.getElementById('gmailStatusHint');
+    const gmailSteps = document.getElementById('gmailSteps');
+    const gmailStatusMessage = document.getElementById('gmailStatusMessage');
+    const gmailConnectBtn = document.getElementById('gmailConnectBtn');
+    const gmailDisconnectBtn = document.getElementById('gmailDisconnectBtn');
+    const gmailRefreshBtn = document.getElementById('gmailRefreshBtn');
+    let gmailStatusCache = null;
 
     function firstNameFromProfile(profile) {
       if (profile?.firstName) return profile.firstName;
@@ -135,19 +170,36 @@
       return 'Friend';
     }
 
+    async function syncTimezone() {
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (!tz) return;
+        await api('/api/timezone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ timezone: tz }),
+        });
+      } catch (err) {
+        console.warn('Timezone sync failed:', err);
+      }
+    }
+
     function sortReports(arr, key, dir) {
       const m = dir === 'desc' ? -1 : 1;
-      return arr.slice().sort((a,b) => {
+      return arr.slice().sort((a, b) => {
         const av = (a[key] ?? '').toString().toLowerCase();
         const bv = (b[key] ?? '').toString().toLowerCase();
         if (key === 'createdAt') return (new Date(a.createdAt) - new Date(b.createdAt)) * m;
-        return av < bv ? -1*m : av > bv ? 1*m : 0;
+        return av < bv ? -1 * m : av > bv ? 1 * m : 0;
       });
     }
 
     async function api(path, opts) {
       const res = await fetch(path, { credentials: 'include', ...opts });
-      if (res.status === 401) { location.href = '/login.html'; return {}; }
+      if (res.status === 401) {
+        location.href = '/login.html';
+        return {};
+      }
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     }
@@ -156,12 +208,101 @@
       if (!sub) return 'Subscription inactive';
       const status = titleCase((sub.status || 'inactive').replace(/[._-]+/g, ' '));
       const planLabel = displayPlan(sub.plan);
-      if (!sub.renewsAt) return `${status} • ${planLabel} plan`;
-      return `${status} • Renews ${fmtDate(sub.renewsAt)}`;
+      if (!sub.renewsAt) return `${status} - ${planLabel} plan`;
+      return `${status} - Renews ${fmtDate(sub.renewsAt)}`;
     }
 
+    function setGmailMessage(text, kind = 'error') {
+      if (!gmailStatusMessage) return;
+      if (!text) {
+        gmailStatusMessage.textContent = '';
+        gmailStatusMessage.classList.add('hidden');
+        return;
+      }
+      gmailStatusMessage.textContent = text;
+      gmailStatusMessage.classList.remove('hidden');
+      gmailStatusMessage.classList.toggle('text-emerald-600', kind === 'success');
+      gmailStatusMessage.classList.toggle('text-amber-600', kind !== 'success');
+    }
+
+    function updateGmailCtaLabel() {
+      if (!gmailConnectBtn) return;
+      const connected = Boolean(gmailStatusCache?.connected && gmailStatusCache?.hasTokens);
+      gmailConnectBtn.textContent = connected ? 'Reconnect Gmail' : 'Connect Gmail';
+    }
+
+    async function loadGmailStatus() {
+      if (!gmailSection) return;
+      gmailSection.classList.remove('hidden');
+      gmailStatusHeading.textContent = 'Checking Gmail tokens...';
+      gmailStatusHint.textContent = 'Hang tight while we look for stored access.';
+      gmailSteps?.classList.add('hidden');
+      setGmailMessage('');
+      try {
+        const resp = await api('/gmail/status');
+        const status = resp?.status || {};
+        gmailStatusCache = status;
+        const connected = Boolean(status.connected && status.hasTokens);
+        gmailStatusHeading.textContent = connected ? 'Gmail connected' : 'One more step: connect Gmail';
+        gmailStatusHint.textContent = connected
+          ? `InboxVetter can manage your inbox. Last updated ${fmtDate(status.updatedAt || status.expiryDate || new Date().toISOString())}.`
+          : 'Authorize InboxVetter so we can label, triage, and delete emails for you.';
+        gmailSteps?.classList.toggle('hidden', connected);
+        gmailDisconnectBtn?.classList.toggle('hidden', !connected);
+        updateGmailCtaLabel();
+      } catch (err) {
+        gmailStatusHeading.textContent = 'Gmail setup unavailable';
+        gmailStatusHint.textContent = 'Double-check your Google OAuth environment variables.';
+        setGmailMessage(err?.message || 'Failed to load Gmail status.');
+        gmailDisconnectBtn?.classList.add('hidden');
+      }
+    }
+
+    gmailConnectBtn?.addEventListener('click', async () => {
+      try {
+        gmailConnectBtn.disabled = true;
+        if (gmailRefreshBtn) gmailRefreshBtn.disabled = true;
+        setGmailMessage('');
+        gmailConnectBtn.textContent = 'Opening Google...';
+        const res = await fetch('/gmail/start', { method: 'POST', credentials: 'include' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.url) throw new Error(data?.error || 'Failed to start Gmail connect.');
+        window.location.href = data.url;
+        return;
+      } catch (err) {
+        console.error(err);
+        setGmailMessage(err?.message || 'Unable to open Google consent.');
+        updateGmailCtaLabel();
+      } finally {
+        gmailConnectBtn.disabled = false;
+        if (gmailRefreshBtn) gmailRefreshBtn.disabled = false;
+      }
+    });
+
+    gmailDisconnectBtn?.addEventListener('click', async () => {
+      try {
+        gmailDisconnectBtn.disabled = true;
+        setGmailMessage('');
+        await api('/gmail/disconnect', { method: 'POST' });
+        setGmailMessage('Disconnected. Tokens removed from this environment.', 'success');
+      } catch (err) {
+        console.error(err);
+        setGmailMessage(err?.message || 'Failed to disconnect Gmail.');
+      } finally {
+        gmailDisconnectBtn.disabled = false;
+        await loadGmailStatus();
+      }
+    });
+
+    gmailRefreshBtn?.addEventListener('click', () => {
+      loadGmailStatus().catch((err) => {
+        console.error(err);
+        setGmailMessage(err?.message || 'Failed to refresh Gmail status.');
+      });
+    });
+
     async function main() {
-      // Current user
+      await syncTimezone();
       const meResp = await api('/api/me');
       const me = meResp.user || {};
       document.getElementById('welcome').textContent = `Welcome, ${firstNameFromProfile(me)}!`;
@@ -172,10 +313,10 @@
       document.getElementById('planStatus').textContent = describeSubscription(me.subscription);
       if (me.picture) {
         const img = document.getElementById('avatar');
-        img.src = me.picture; img.classList.remove('hidden');
+        img.src = me.picture;
+        img.classList.remove('hidden');
       }
 
-      // Events
       document.getElementById('logoutBtn').addEventListener('click', async () => {
         await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
         location.href = '/login.html';
@@ -190,7 +331,8 @@
         location.href = '/settings.html#subscription';
       });
 
-      // Reports
+      await loadGmailStatus();
+
       const reportsResp = await api('/api/reports');
       let reports = (reportsResp && reportsResp.reports) || [];
       const list = document.getElementById('list');
@@ -202,16 +344,16 @@
         const sorted = sortReports(reports, key, dir);
         list.innerHTML = '';
         if (!sorted.length) {
-          empty.classList.remove('hidden'); return;
+          empty.classList.remove('hidden');
+          return;
         }
         empty.classList.add('hidden');
         for (const r of sorted) {
           const el = rowTpl.content.cloneNode(true);
           el.querySelector('h3').textContent = r.title || r.id;
           el.querySelector('p:nth-of-type(1)').textContent = r.description || r.snippet || '';
-          el.querySelector('p:nth-of-type(2)').textContent = `Status: ${titleCase((r.status || 'unknown').replace(/[._-]+/g, ' '))} • ${fmtDate(r.createdAt)}`;
-          const a = el.querySelector('a');
-          a.href = `/api/reports/${encodeURIComponent(r.id)}`;
+          el.querySelector('p:nth-of-type(2)').textContent = `Status: ${titleCase((r.status || 'unknown').replace(/[._-]+/g, ' '))} - ${fmtDate(r.createdAt)}`;
+          el.querySelector('a').href = `/api/reports/${encodeURIComponent(r.id)}`;
           list.appendChild(el);
         }
       }
@@ -220,10 +362,11 @@
       render();
     }
 
-    main().catch(err => {
+    main().catch((err) => {
       console.error(err);
       alert('Failed to load dashboard: ' + err.message);
     });
   </script>
 </body>
 </html>
+

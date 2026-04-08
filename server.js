@@ -5,6 +5,7 @@ const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
+const helmet = require("helmet");
 const cookieSession = require("cookie-session");
 const sessionMiddleware = require("./middleware/authMiddleware");
 const errorHandler = require("./middleware/errorHandler");
@@ -13,10 +14,12 @@ const scheduler = require("./services/inboxScheduler");
 const pkg = require("./package.json");
 
 const app = express();
+const isProduction = process.env.NODE_ENV === "production";
 // Render and other hosting providers terminate TLS before forwarding the request
 // to Node. Trust the first proxy hop so `req.secure` is accurate and secure
 // cookies are still sent when the original connection used HTTPS.
 app.set("trust proxy", 1);
+app.disable("x-powered-by");
 const PORT = process.env.PORT || 5173;
 const HOST = process.env.HOST || "0.0.0.0";
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret";
@@ -50,6 +53,10 @@ if (BUILD_COMMIT) {
 
 const isTestMode = process.argv.includes("--test");
 
+if (isProduction && (!process.env.SESSION_SECRET || SESSION_SECRET === "dev-secret")) {
+  console.warn("[security] SESSION_SECRET is missing or using the dev fallback in production.");
+}
+
 // ───────────────────────────────────────────────────────────────────────────────
 // core middleware
 // ───────────────────────────────────────────────────────────────────────────────
@@ -60,6 +67,19 @@ app.post(
 );
 
 app.use(express.json({ limit: "1mb" }));
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+    crossOriginResourcePolicy: { policy: "same-site" },
+    strictTransportSecurity: isProduction
+      ? {
+          maxAge: 31536000,
+          includeSubDomains: true,
+        }
+      : false,
+  })
+);
 app.use(
   cookieSession({
     name: SESSION_COOKIE_NAME,

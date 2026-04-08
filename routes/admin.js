@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const { requireAuth } = require("../middleware/authMiddleware");
 const { requireAdmin } = require("../middleware/adminMiddleware");
+const { billingWriteLimiter } = require("../middleware/rateLimiters");
 const { User } = require("../models");
 
 // View subscriptions for all users
@@ -12,7 +13,7 @@ router.get("/subscriptions", requireAuth, requireAdmin, async (req, res) => {
 });
 
 // Update a user's subscription (admin override)
-router.post("/subscriptions", requireAuth, requireAdmin, async (req, res) => {
+router.post("/subscriptions", requireAuth, requireAdmin, billingWriteLimiter, async (req, res) => {
   const { email, plan, status, seats, renewsAt } = req.body || {};
   if (!email) {
     return res.status(400).json({ ok: false, error: "email required" });

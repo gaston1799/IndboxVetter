@@ -31,7 +31,7 @@ function buildReportRecord({ email, run, summary }) {
   const description = summary.important
     ? `${summary.important} message(s) flagged as important.`
     : `Reviewed ${summary.total} message(s); nothing marked important.`;
-  const snippet = `Important ${summary.important} • Trash ${summary.trash} • Keep ${summary.keep}`;
+  const snippet = `Important ${summary.important} ï¿½ Trash ${summary.trash} ï¿½ Keep ${summary.keep}`;
   const status = summary.important ? "urgent" : "completed";
   const reportPathRelative = path.relative(process.cwd(), run.report.path);
 
@@ -95,7 +95,7 @@ async function executeInboxRun(email, { overrides = {}, trigger = "manual", log 
       reportRecord,
       processedMessageIds: run.processedMessageIds,
       logs,
-      nextRunAt: overrides.nextRunAt || computeNextRun(run.report.generatedAt),
+      nextRunAt: overrides.nextRunAt || computeNextRun(run.report.generatedAt, ctx.user.timezone),
     });
 
     return {

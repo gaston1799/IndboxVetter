@@ -4,6 +4,8 @@ node_modules/
 dist/
 coverage/
 *.log
+logs/
+data/users/
 
 # OS files
 .DS_Store

@@ -1,6 +1,7 @@
 // config/db.js (file-based JSON "DB")
 const fs = require("fs");
 const path = require("path");
+const { DateTime } = require("luxon");
 
 const DATA_DIR = path.join(__dirname, "..", "data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
@@ -10,6 +11,12 @@ const ADMIN_SET = new Set(
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean)
 );
+const CREATOR_EMAIL = (process.env.CREATOR_EMAIL || "naquangaston@gmail.com").toLowerCase();
+const DEFAULT_RUN_HOUR = (() => {
+  const raw = Number(process.env.VETTER_RUN_HOUR);
+  if (!Number.isFinite(raw)) return 3;
+  return Math.min(23, Math.max(0, Math.round(raw)));
+})();
 
 const DEFAULT_SETTINGS = {
   openaiKey: "",
@@ -87,6 +94,10 @@ function writeDB(db) {
   } catch (err) {
     console.error("DB write error:", err);
   }
+}
+
+function isCreatorEmail(email) {
+  return (email || "").toLowerCase() === CREATOR_EMAIL;
 }
 
 function defaultSubscription(plan = "free") {
@@ -176,6 +187,49 @@ function ensureUserDefaults(user) {
       changed = true;
     }
   }
+  if (user.timezone === undefined) {
+    user.timezone = null;
+    changed = true;
+  } else if (typeof user.timezone === "string") {
+    const trimmed = user.timezone.trim();
+    if (trimmed !== user.timezone) {
+      user.timezone = trimmed || null;
+      changed = true;
+    }
+  } else if (user.timezone && typeof user.timezone !== "string") {
+    user.timezone = null;
+    changed = true;
+  }
+  if (isCreatorEmail(user.email)) {
+    if (user.subscription.plan !== "basic") {
+      user.subscription.plan = "basic";
+      changed = true;
+    }
+    if (user.subscription.status !== "active") {
+      user.subscription.status = "active";
+      changed = true;
+    }
+    if (user.subscription.renewsAt !== null) {
+      user.subscription.renewsAt = null;
+      changed = true;
+    }
+    if (user.subscription.seats !== 1) {
+      user.subscription.seats = 1;
+      changed = true;
+    }
+    if (user.subscription.stripeSubscriptionId) {
+      user.subscription.stripeSubscriptionId = null;
+      changed = true;
+    }
+    if (user.subscription.stripeCustomerId) {
+      user.subscription.stripeCustomerId = null;
+      changed = true;
+    }
+    if (user.plan !== "basic") {
+      user.plan = "basic";
+      changed = true;
+    }
+  }
   if (!user.settings) {
     user.settings = applySettingDefaults();
     changed = true;
@@ -235,6 +289,22 @@ function ensureUserDefaults(user) {
     changed = true;
   }
   return changed;
+}
+
+function finalizeScheduledCancellation(user) {
+  if (!user?.subscription) return false;
+  const status = (user.subscription.status || "").toLowerCase();
+  if (status !== "scheduled_for_cancellation") return false;
+  const renewsAt = user.subscription.renewsAt ? new Date(user.subscription.renewsAt) : null;
+  if (!renewsAt || Number.isNaN(renewsAt.getTime())) return false;
+  if (renewsAt.getTime() > Date.now()) return false;
+
+  user.subscription.plan = "free";
+  user.subscription.status = "canceled";
+  user.subscription.renewsAt = null;
+  user.subscription.stripeSubscriptionId = null;
+  user.plan = "free";
+  return true;
 }
 
 function sanitizeUser(user) {
@@ -383,7 +453,11 @@ function getSubscription(email) {
   const ctx = getUserInternal(email);
   if (!ctx) return defaultSubscription("free");
   ctx.user.subscription = ctx.user.subscription || defaultSubscription(ctx.user.plan);
-  if (ensureUserDefaults(ctx.user)) {
+  let dirty = ensureUserDefaults(ctx.user);
+  if (finalizeScheduledCancellation(ctx.user)) {
+    dirty = true;
+  }
+  if (dirty) {
     writeDB(ctx.db);
   }
   return ctx.user.subscription;
@@ -393,6 +467,13 @@ function updateSubscription(email, updates) {
   const ctx = getUserInternal(email);
   if (!ctx) return null;
   const sub = ctx.user.subscription || defaultSubscription(ctx.user.plan);
+
+  if (isCreatorEmail(ctx.user.email)) {
+    if (ensureUserDefaults(ctx.user)) {
+      writeDB(ctx.db);
+    }
+    return ctx.user.subscription;
+  }
 
   if (updates.plan && typeof updates.plan === "string") {
     sub.plan = updates.plan;
@@ -524,9 +605,17 @@ function sanitizeVetterState(state = {}) {
 function getVetterState(email) {
   const ctx = getUserInternal(email);
   if (!ctx) return sanitizeVetterState(DEFAULT_VETTER_STATE);
-  if (ensureUserDefaults(ctx.user)) {
-    writeDB(ctx.db);
+  let dirty = ensureUserDefaults(ctx.user);
+  if (ctx.user?.vetter?.active) {
+    const last = ctx.user.vetter.lastRunAt ? new Date(ctx.user.vetter.lastRunAt) : null;
+    const tooOld = !last || Date.now() - last.getTime() > 15 * 60 * 1000; // 15 minutes
+    if (tooOld) {
+      ctx.user.vetter.active = false;
+      appendVetterLog(ctx.user, "Cleared stuck InboxVetter run state.", "warn");
+      dirty = true;
+    }
   }
+  if (dirty) writeDB(ctx.db);
   return sanitizeVetterState(ctx.user.vetter);
 }
 
@@ -544,13 +633,68 @@ function appendVetterLog(user, message, level = "info") {
   }
   return entry;
 }
-function computeNextRun(lastRunAt) {
-  const base = lastRunAt ? new Date(lastRunAt) : new Date();
-  if (!Number.isFinite(base.getTime())) {
-    return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+function computeNextRun(lastRunAt, timezone) {
+  const base = lastRunAt
+    ? DateTime.fromISO(lastRunAt, { zone: "utc" })
+    : DateTime.utc();
+  const safeBase = base.isValid ? base : DateTime.utc();
+  const zone = (typeof timezone === "string" && timezone.trim()) || null;
+  const hour = Number.isFinite(DEFAULT_RUN_HOUR) ? DEFAULT_RUN_HOUR : 3;
+
+  const localBase = zone ? safeBase.setZone(zone) : safeBase.setZone("UTC");
+  let nextLocal = localBase.set({
+    hour,
+    minute: 0,
+    second: 0,
+    millisecond: 0,
+  });
+  if (nextLocal <= localBase) {
+    nextLocal = nextLocal.plus({ days: 1 });
   }
-  base.setDate(base.getDate() + 7);
-  return base.toISOString();
+  return nextLocal.setZone("utc").toISO();
+}
+
+function ensureNextRunScheduled(email) {
+  const ctx = getUserInternal(email);
+  if (!ctx) return null;
+  if (ensureUserDefaults(ctx.user)) {
+    writeDB(ctx.db);
+  }
+  if (!ctx.user.vetter) {
+    ctx.user.vetter = { ...DEFAULT_VETTER_STATE };
+  }
+  let iso = ctx.user.vetter.nextRunAt;
+  let ts = iso ? Date.parse(iso) : NaN;
+  if (!Number.isFinite(ts) || ts <= Date.now()) {
+    iso = computeNextRun(ctx.user.vetter.lastRunAt, ctx.user.timezone);
+    ctx.user.vetter.nextRunAt = iso;
+    writeDB(ctx.db);
+    ts = Date.parse(iso);
+  }
+  return { iso, ts };
+}
+
+function updateTimezone(email, timezone) {
+  const ctx = getUserInternal(email);
+  if (!ctx) return null;
+  const tz =
+    typeof timezone === "string" && timezone.trim() ? timezone.trim() : null;
+  if (tz) {
+    const probe = DateTime.now().setZone(tz);
+    if (!probe.isValid) {
+      throw new Error("Invalid timezone");
+    }
+  }
+  ctx.user.timezone = tz;
+  if (!ctx.user.vetter) {
+    ctx.user.vetter = { ...DEFAULT_VETTER_STATE };
+  }
+  ctx.user.vetter.nextRunAt = computeNextRun(
+    ctx.user.vetter.lastRunAt,
+    ctx.user.timezone
+  );
+  writeDB(ctx.db);
+  return { timezone: ctx.user.timezone, nextRunAt: ctx.user.vetter.nextRunAt };
 }
 
 function beginVetterRun(email) {
@@ -581,7 +725,8 @@ function finalizeVetterRun(ctx, { reportRecord, processedMessageIds, logs = [], 
   }
   ctx.user.vetter.active = false;
   ctx.user.vetter.lastRunAt = recordCreated;
-  ctx.user.vetter.nextRunAt = nextRunAt || computeNextRun(recordCreated);
+  ctx.user.vetter.nextRunAt =
+    nextRunAt || computeNextRun(recordCreated, ctx.user.timezone);
   logs.forEach((entry) => {
     if (!entry) return;
     appendVetterLog(ctx.user, entry.message || entry, entry.level || "info");
@@ -651,6 +796,8 @@ module.exports = {
   finalizeVetterRun,
   failVetterRun,
   computeNextRun,
+  updateTimezone,
+  ensureNextRunScheduled,
   addTransaction,
   getTransactions,
 };

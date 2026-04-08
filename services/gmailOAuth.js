@@ -1,34 +1,64 @@
 "use strict";
 
 const { google } = require("googleapis");
-const { SCOPES } = require("./inboxRunner");
 const scheduler = require("./inboxScheduler");
 const { loadTokens, saveTokens, clearTokens } = require("./gmailTokenStore");
 const { updateGmailIntegration, getGmailIntegration } = require("../config/db");
 
+// Avoid circular requires: keep Gmail scopes defined locally.
+const GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.modify"];
+
 function ensureGoogleConfig() {
   const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET;
-  const redirectUri =
-    process.env.GMAIL_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URL;
+  const redirectRaw =
+    process.env.GMAIL_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URL || "";
+  const redirectUris = redirectRaw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
-  if (!clientId || !clientSecret || !redirectUri) {
-    throw new Error("Google OAuth client not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI.");
+  if (!clientId || !clientSecret || !redirectUris.length) {
+    throw new Error(
+      "Google OAuth client not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GMAIL_REDIRECT_URI."
+    );
   }
 
-  return { clientId, clientSecret, redirectUri };
+  return { clientId, clientSecret, redirectUris };
 }
 
-function createOAuthClient() {
-  const { clientId, clientSecret, redirectUri } = ensureGoogleConfig();
-  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+function selectRedirectUri(preferredOrigin) {
+  const { redirectUris } = ensureGoogleConfig();
+  if (!redirectUris.length) return null;
+  if (preferredOrigin) {
+    const normalized = preferredOrigin.toLowerCase();
+    const found = redirectUris.find((uri) => {
+      try {
+        return new URL(uri).origin.toLowerCase() === normalized;
+      } catch (err) {
+        return false;
+      }
+    });
+    if (found) return found;
+  }
+  return redirectUris[0];
 }
 
-function generateAuthUrl({ state, loginHint } = {}) {
-  const client = createOAuthClient();
+function createOAuthClient(redirectUri) {
+  const { clientId, clientSecret } = ensureGoogleConfig();
+  const effectiveRedirect = redirectUri || selectRedirectUri(null);
+  return new google.auth.OAuth2(clientId, clientSecret, effectiveRedirect);
+}
+
+function generateAuthUrl({ state, loginHint, redirectUri } = {}) {
+  const client = createOAuthClient(redirectUri);
+  const scopeList = Array.isArray(GMAIL_SCOPES) ? GMAIL_SCOPES : [GMAIL_SCOPES].filter(Boolean);
+  if (!scopeList.length) {
+    throw new Error("No Gmail OAuth scopes configured.");
+  }
   return client.generateAuthUrl({
     access_type: "offline",
-    scope: SCOPES,
+    scope: scopeList.join(" "),
     prompt: "consent",
     state,
     include_granted_scopes: true,
@@ -36,12 +66,20 @@ function generateAuthUrl({ state, loginHint } = {}) {
   });
 }
 
-async function exchangeCode(code) {
+async function exchangeCode(code, redirectUri) {
   if (!code) throw new Error("Missing authorization code");
-  const client = createOAuthClient();
-  const { redirectUri } = ensureGoogleConfig();
-  const { tokens } = await client.getToken({ code, redirect_uri: redirectUri });
+  const client = createOAuthClient(redirectUri);
+  const { tokens } = await client.getToken({ code, redirect_uri: redirectUri || undefined });
   return tokens;
+}
+
+async function getGmailAddress(tokens, redirectUri) {
+  if (!tokens) return null;
+  const client = createOAuthClient(redirectUri);
+  client.setCredentials(tokens);
+  const gmail = google.gmail({ version: "v1", auth: client });
+  const { data } = await gmail.users.getProfile({ userId: "me" });
+  return data?.emailAddress || null;
 }
 
 function mergeTokens(email, nextTokens) {
@@ -64,7 +102,9 @@ function storeTokens(email, tokens) {
   const merged = mergeTokens(email, tokens);
   saveTokens(email, merged);
   markIntegration(email, true);
-  scheduler.startForUser(email);
+  if (typeof scheduler.startForUser === "function") {
+    scheduler.startForUser(email);
+  }
   return merged;
 }
 
@@ -91,9 +131,11 @@ module.exports = {
   createOAuthClient,
   generateAuthUrl,
   exchangeCode,
+  getGmailAddress,
   storeTokens,
   getStatus,
   disconnect,
+  selectRedirectUri,
 };
 
 

@@ -2,15 +2,19 @@ const express = require("express");
 const router = express.Router();
 
 const { verifyIdToken } = require("../config/google");
+const { authLimiter } = require("../middleware/rateLimiters");
 const User = require("../models/User");
 
 // Sign-in with Google Identity Services (POSTed ID token)
-router.post("/google", async (req, res) => {
+router.post("/google", authLimiter, async (req, res) => {
   try {
     const idToken = req.body?.credential;
     if (!idToken) return res.status(400).json({ ok: false, error: "Missing credential" });
 
     const p = await verifyIdToken(idToken); // { sub, email, name, picture, exp }
+    if (!p.email || !p.emailVerified) {
+      return res.status(401).json({ ok: false, error: "Google account email is not verified" });
+    }
     const user = await User.findOrCreate({ id: p.sub, email: p.email, name: p.name, picture: p.picture });
 
     req.session.user = {
@@ -21,7 +25,8 @@ router.post("/google", async (req, res) => {
     };
     res.json({ ok: true, user });
   } catch (e) {
-    res.status(401).json({ ok: false, error: e.message });
+    console.warn("[auth] Google sign-in failed:", e?.message || e);
+    res.status(401).json({ ok: false, error: "Invalid Google sign-in credential" });
   }
 });
 

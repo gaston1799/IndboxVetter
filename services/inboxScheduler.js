@@ -6,19 +6,10 @@ const { loadTokens } = require("./gmailTokenStore");
 const {
   listUsers,
   getSubscription,
-  saveReports,
+  ensureNextRunScheduled,
 } = require("../config/db");
 
-const DEFAULT_INTERVAL_MS = parseInt(process.env.INBOX_POLL_INTERVAL_MS, 10) || 5 * 60 * 1000;
-const MIN_INTERVAL_MS = 60 * 1000;
-
 const jobs = new Map();
-
-function normalizeInterval(ms) {
-  const n = Number(ms);
-  if (!Number.isFinite(n) || n <= 0) return DEFAULT_INTERVAL_MS;
-  return Math.max(MIN_INTERVAL_MS, n);
-}
 
 function hasTokens(email) {
   const tokens = loadTokens(email);
@@ -29,26 +20,37 @@ async function runJob(job) {
   if (job.running) return;
   job.running = true;
   try {
+    const subscription = getSubscription(job.email);
+    if (!shouldAutoRun(subscription)) {
+      job.logger?.info?.("Subscription inactive; stopping job.");
+      stopForUser(job.email);
+      return;
+    }
+
     if (!hasTokens(job.email)) {
       job.lastError = "Missing Gmail tokens";
       job.logger?.warn?.(`Gmail tokens missing for ${job.email}; skipping run.`);
       return;
     }
 
-    const run = await runInboxOnce(job.email);
+    const run = await runScheduledInbox(job.email, {
+      log: (msg) => job.logger?.info?.(msg),
+    });
     job.lastRun = new Date().toISOString();
     job.lastError = null;
 
-    const records = toReportRecords(job.email, run);
-    if (records.length) {
-      saveReports(job.email, records);
-      job.logger?.info?.(`Saved ${records.length} classified email(s) for ${job.email}.`);
+    if (run?.ok) {
+      job.logger?.info?.(
+        `Inbox run complete for ${job.email}. Reviewed ${run?.stats?.reviewed ?? "?"} messages.`
+      );
+    } else if (run?.alreadyActive) {
+      job.logger?.info?.(`Inbox run already active for ${job.email}; skipping.`);
     } else {
-      job.logger?.info?.(`Processed inbox for ${job.email}; no new items.`);
+      job.logger?.warn?.(`Inbox run for ${job.email} finished without ok flag.`);
     }
   } catch (err) {
     job.lastError = err?.message || String(err);
-    if (err instanceof MissingGmailTokensError) {
+    if (err instanceof GmailTokenMissingError) {
       job.logger?.warn?.(`Stopping job for ${job.email}: ${job.lastError}`);
       stopForUser(job.email);
     } else {
@@ -56,6 +58,9 @@ async function runJob(job) {
     }
   } finally {
     job.running = false;
+    if (jobs.has(job.email)) {
+      scheduleJob(job);
+    }
   }
 }
 
@@ -66,18 +71,18 @@ function startForUser(email, opts = {}) {
     stopForUser(email);
     return null;
   }
-  const intervalMs = normalizeInterval(opts.intervalMs || DEFAULT_INTERVAL_MS);
   const existing = jobs.get(email);
   if (existing) {
-    if (existing.intervalMs === intervalMs) {
+    if (opts.force) {
+      stopForUser(email);
+    } else {
+      scheduleJob(existing);
       return existing;
     }
-    stopForUser(email);
   }
 
   const job = {
     email,
-    intervalMs,
     timer: null,
     running: false,
     lastRun: null,
@@ -85,21 +90,15 @@ function startForUser(email, opts = {}) {
     logger: createLogger(email),
   };
 
-  job.timer = setInterval(() => {
-    runJob(job);
-  }, intervalMs);
-
   jobs.set(email, job);
-  setImmediate(() => runJob(job));
-  job.logger.info(`Scheduled inbox processing every ${Math.round(intervalMs / 1000)}s.`);
+  scheduleJob(job);
   return job;
 }
-
 
 function stopForUser(email) {
   const job = jobs.get(email);
   if (!job) return false;
-  clearInterval(job.timer);
+  clearTimeout(job.timer);
   jobs.delete(email);
   job.logger?.info?.("Stopped inbox processing job.");
   return true;
@@ -151,6 +150,26 @@ function getJob(email) {
   return jobs.get(email) || null;
 }
 
+function scheduleJob(job) {
+  const next = ensureNextRunScheduled(job.email);
+  if (!next || !Number.isFinite(next.ts)) {
+    job.logger?.warn?.("Unable to determine next run; stopping job.");
+    stopForUser(job.email);
+    return;
+  }
+  const delay = Math.max(30 * 1000, next.ts - Date.now());
+  if (delay === Infinity) {
+    job.logger?.warn?.("Invalid delay computed; stopping job.");
+    stopForUser(job.email);
+    return;
+  }
+  clearTimeout(job.timer);
+  job.timer = setTimeout(() => runJob(job), delay);
+  job.logger?.info?.(
+    `Next run ${new Date(next.ts).toISOString()} (in ${Math.round(delay / 60000)}m).`
+  );
+}
+
 module.exports = {
   startForUser,
   stopForUser,
@@ -158,10 +177,3 @@ module.exports = {
   bootstrap,
   getJob,
 };
-
-
-
-
-
-
-

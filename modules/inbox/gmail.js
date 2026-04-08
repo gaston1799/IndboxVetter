@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { google } = require("googleapis");
 
-const { ensureGoogleConfig } = require("../../services/gmailOAuth");
+const { ensureGoogleConfig, selectRedirectUri } = require("../../services/gmailOAuth");
 const { loadTokens, saveTokens } = require("../../services/gmailTokenStore");
 const { getUserWorkspace } = require("../../services/userStorage");
 
@@ -54,7 +54,8 @@ async function getAuthorizedGmail(email) {
   if (!tokens || !tokens.refresh_token) {
     throw new GmailTokenMissingError(email);
   }
-  const { clientId, clientSecret, redirectUri } = ensureGoogleConfig();
+  const { clientId, clientSecret } = ensureGoogleConfig();
+  const redirectUri = selectRedirectUri(null);
   const auth = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
   let currentTokens = { ...tokens };
   auth.setCredentials(currentTokens);

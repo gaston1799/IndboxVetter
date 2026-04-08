@@ -50,6 +50,7 @@ exports.getSubscription = (req, res) => {
   if (!email) return;
 
   const subscription = getSubscriptionFromStore(email);
+  syncScheduler(email, subscription);
   res.json({ ok: true, subscription });
 };
 

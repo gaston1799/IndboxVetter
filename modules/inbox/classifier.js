@@ -1,16 +1,22 @@
 "use strict";
 
+// Ensure local .env is loaded for standalone scripts/tests.
+require("dotenv").config();
+
 const OpenAI = require("openai").default;
 const { DEFAULT_OPENAI_MODEL } = require("./config");
+const { pickOpenAIKey } = require("../../utils/openaiKey");
 
 let cachedClient = null;
 
 function getOpenAIClient() {
   if (cachedClient) return cachedClient;
-  const apiKey = (process.env.OPENAI_API_KEY || process.env.HOUNDOPENAI_API_KEY || "").trim();
+  const { chosen: apiKey } = pickOpenAIKey();
   if (!apiKey) {
-    throw new Error("OPENAI_API_KEY (or HOUNDOPENAI_API_KEY) is required for classification.");
+    throw new Error("OPENAI_API_KEY or HOUSE_OPENAI_KEY is required for classification.");
   }
+  // Normalize environment so downstream calls use the chosen key
+  process.env.OPENAI_API_KEY = apiKey;
   cachedClient = new OpenAI({ apiKey });
   return cachedClient;
 }
